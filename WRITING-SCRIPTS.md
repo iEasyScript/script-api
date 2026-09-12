@@ -1,26 +1,37 @@
 # Writing Project X scripts
 
-This guide takes you from an empty folder to a script running in the client.
-Everything here compiles against the published API jars — no engine source needed.
+Scripts can be written in **Kotlin or Java**. This guide covers both, from an
+empty folder to a script running in the client. Everything compiles against the
+published API jars — no engine source needed.
+
+If you are choosing: Kotlin gives you the API directly and reads more cleanly.
+Java is fully supported through a small base class that keeps it safe. The two
+can live in the same project and the same jar.
 
 ## 1. Set up a project
 
 You need JDK 25. Clone the [starter template](https://github.com/iEasyScript/script-template),
-or build the same structure yourself:
+which has one working script in each language, or build the same structure yourself:
 
 ```
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── libs/                 <- the three API jars go here
-└── src/main/kotlin/...   <- your scripts
+├── libs/                  <- the three API jars go here
+├── src/main/kotlin/...    <- Kotlin scripts
+└── src/main/java/...      <- Java scripts
 ```
 
-The build file needs three things. Kotlin 2.3.20 and JVM toolchain 25, to match
-the engine. The API jars as `compileOnly`. And coroutines, because scripts are
-suspend functions.
+The build file needs Kotlin 2.3.20 and JVM toolchain 25 to match the engine, the
+`java` plugin if you want Java scripts, the API jars as `compileOnly`, and
+coroutines:
 
 ```kotlin
+plugins {
+    java
+    kotlin("jvm") version "2.3.20"
+}
+
 dependencies {
     compileOnly(fileTree("libs") { include("*.jar") })
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
@@ -32,7 +43,12 @@ them into your jar would shadow the running engine and break in confusing ways.
 
 ## 2. Write a script
 
-A script is a class extending `Script`, annotated so the engine can find it:
+Both languages use the same `@ScriptDescription` annotation. That annotation is
+how the engine discovers your script, so it is not optional.
+
+### Kotlin
+
+Extend `Script` and implement `loop()`, which is a suspend function:
 
 ```kotlin
 @ScriptDescription(
@@ -54,42 +70,78 @@ class ExampleWoodcutter : Script() {
 }
 ```
 
-`loop()` is called repeatedly for as long as the script runs. `onStart()`,
-`onStop()`, `onEvent()` and `render()` are optional overrides.
+### Java
 
-The annotation is how the engine discovers your script, so it is not optional.
-`visible = false` hides a script from the list without removing it.
+Extend `JavaScript` and implement `onLoop()`, which returns a `Wait`:
+
+```java
+@ScriptDescription(
+    name = "Example Java Woodcutter",
+    version = "1.0.0",
+    author = "Your Name",
+    description = "Chops trees and drops the logs."
+)
+public class ExampleJavaWoodcutter extends JavaScript {
+
+    @Override
+    public Wait onLoop() {
+        if (interactClosestObject("Tree", "Chop down", 20)) {
+            return Wait.xpDrop();
+        }
+        return Wait.ms(320, 200);
+    }
+}
+```
+
+Import the API as static methods: `import static com.projectx.script.api.APIKt.*;`
+
+`onStart()`, `onStop()`, `onEvent()` and `render()` are optional overrides in
+both languages.
+
+### Why Java returns a Wait instead of waiting
+
+Script bodies run on the client's main-logic tick, on the game thread. So a
+script must never block — a `Thread.sleep` would freeze the client.
+
+Kotlin handles this with suspend functions. Java cannot: the Kotlin `loop()`
+receives a continuation that Java has no way to honour. The trap is that calling
+a suspend helper from Java **compiles cleanly with no warning**, then silently
+fails to wait. You get a loop spinning at tick rate, clicking dozens of times a
+second — useless, and the most obvious thing a script can do.
+
+So `onLoop()` returns the wait it wants and the engine performs it properly.
+`loop()` is final in `JavaScript`, so you cannot reach the unsafe path by
+accident.
 
 ## 3. The one habit that matters
 
 **React to outcomes. Never sleep a fixed amount and hope.**
 
-The example waits on `waitForXPDrop()`, which returns when the game actually
-granted experience. A fixed `delay(3000)` would be wrong twice over: too short
-and you act before the action finished, too long and you idle obviously.
+Both examples wait on an experience drop, which returns when the game actually
+granted experience. A fixed three-second delay would be wrong twice over: too
+short and you act before the action finished, too long and you idle obviously.
 
-The engine gives you outcome-gated waits, all of which take a timeout so a
-missed interaction cannot hang the script forever:
+Every wait takes a timeout, so a missed interaction cannot hang the script.
 
-| Call | Waits until |
-|---|---|
-| `delayUntil(timeoutMillis) { ... }` | the predicate becomes true |
-| `delayWhile(timeoutMillis) { ... }` | the predicate becomes false |
-| `waitForEvent(timeoutMillis) { ... }` | a matching event arrives |
-| `waitForXPDrop()` | experience is granted |
+| Kotlin | Java | Waits until |
+|---|---|---|
+| `delayUntil(timeout) { ... }` | `Wait.until(() -> ..., timeout)` | the predicate becomes true |
+| `delayWhile(timeout) { ... }` | `Wait.whileTrue(() -> ..., timeout)` | the predicate becomes false |
+| `waitForXPDrop()` | `Wait.xpDrop()` | experience is granted |
+| `waitForEvent(timeout) { ... }` | — | a matching event arrives |
+| `delay(mean, variance)` | `Wait.ms(mean, variance)` | a randomised pause elapses |
 
 The second habit: **never interact without a minimum interval.** A loop that
 interacts and returns is re-entered on the next tick. Without a delay on every
-path, including early returns, that is dozens of clicks per second at one
-object, which is both useless and the most obvious thing a script can do.
+path, including early returns, that is click spam.
 
-`delay(240, 90)` takes a mean and a spread, giving a randomised pause rather
-than a constant. Use it everywhere instead of a fixed number.
+Use the randomised forms rather than a constant. A delay that is always exactly
+400ms is a recognisable pattern.
 
 ## 4. State machines, for anything with phases
 
-A script with distinct phases should extend `StateMachineScript` instead of
-driving flags by hand:
+Kotlin scripts with distinct phases should extend `StateMachineScript` rather
+than driving flags by hand:
 
 ```kotlin
 class MyScript : StateMachineScript<MyScript>() {
@@ -109,10 +161,13 @@ private object Gathering : State<MyScript>() {
 `checkNext()` returns the next state or null to stay put. `stateLoop()` is that
 state's body.
 
+There is no Java equivalent of `StateMachineScript`. In Java, model phases with
+an enum field and switch on it inside `onLoop()`.
+
 ## 5. Give the user settings
 
-Implement `ConfigurableScript` and declare config items as properties. They
-appear in the script's settings panel automatically:
+Implement `ConfigurableScript` and declare config items as fields. They appear
+in the script's settings panel automatically. This works in both languages:
 
 ```kotlin
 class MyScript : Script(), ConfigurableScript {
@@ -126,7 +181,7 @@ class MyScript : Script(), ConfigurableScript {
 
 Available types are `BooleanConfigItem`, `IntConfigItem`, `StringConfigItem`,
 `OptionsConfigItem`, `EnumConfigItem`, `InfoDisplayConfigItem` and
-`ConfigSection`. Read a value with `.value`.
+`ConfigSection`. Read a value with `.value`, or `getValue()` from Java.
 
 ## 6. Run it
 
@@ -135,11 +190,10 @@ Available types are `BooleanConfigItem`, `IntConfigItem`, `StringConfigItem`,
 ```
 
 That builds the jar and copies it to `~/.projectx/scripts/`, which is where the
-engine loads script jars from. Start the engine and your script appears in the
-list.
+engine loads script jars from. Kotlin and Java scripts ship in the same jar and
+are discovered the same way. Start the engine and your script appears in the list.
 
-While iterating, rebuild and hot-reload rather than restarting the client. A
-full restart per edit will cost you more time than writing the script.
+While iterating, rebuild and hot-reload rather than restarting the client.
 
 ## 7. Distributing
 
@@ -147,10 +201,11 @@ Your jar is yours. The API is published so you can build against it without the
 engine source, and nothing requires you to open-source what you write or to
 contribute it back.
 
-Two practical notes. Scripts are compiled Kotlin, so a jar is decompilable —
-treat obfuscation as a speed bump, not protection. And the API tracks the engine
-build, so a jar built against one release is not guaranteed to load against
-another. Say which engine version yours targets, and rebuild when it moves.
+Two practical notes. Scripts are compiled JVM bytecode, so a jar is
+decompilable — treat obfuscation as a speed bump, not protection. And the API
+tracks the engine build, so a jar built against one release is not guaranteed to
+load against another. Say which engine version yours targets, and rebuild when
+it moves.
 
 If you would rather share than sell, open a pull request against
 [community-scripts](https://github.com/iEasyScript/community-scripts).

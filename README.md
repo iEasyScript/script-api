@@ -2,8 +2,9 @@
 
 The public API for writing scripts against the Project X engine.
 
-The engine itself is closed source. This repository publishes the compiled API
-it exposes to scripts, so you can build scripts without the engine source.
+Scripts can be written in **Kotlin or Java**. The engine itself is closed
+source. This repository publishes the compiled API it exposes to scripts, so you
+can build scripts without the engine source.
 
 ## What is published
 
@@ -31,7 +32,8 @@ dependencies {
 `compileOnly` is deliberate. The engine already has these classes loaded, so
 bundling them into your script jar would shadow the running engine.
 
-Build with JDK 25 and Kotlin 2.3.20 to match the engine.
+Build with JDK 25 and Kotlin 2.3.20 to match the engine. Java scripts extend
+`JavaScript` rather than `Script`; the guide explains why.
 
 The engine loads script jars from `~/.projectx/scripts/`.
 
