@@ -24,7 +24,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.1.0
+├── gradle.properties      <- projectxApiVersion=1.2.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -136,6 +136,44 @@ second — useless, and the most obvious thing a script can do.
 So `onLoop()` returns the wait it wants and the engine performs it properly.
 `loop()` is final in `JavaScript`, so you cannot reach the unsafe path by
 accident.
+
+### The waits Java can return
+
+| Wait | What the engine does |
+|---|---|
+| `Wait.ms(millis)` / `Wait.ms(mean, variance)` | A fixed pause, or a randomised one around `mean` |
+| `Wait.between(min, max)` | A pause picked evenly between `min` and `max` ms |
+| `Wait.ticks(ticks)` / `Wait.ticks(ticks, jitterMs)` | Game ticks of 600 ms (fractions allowed), plus up to `jitterMs` |
+| `Wait.until(condition, timeoutMs)` | Until the condition is true, or the timeout |
+| `Wait.whileTrue(condition, timeoutMs)` | While the condition is true, or the timeout |
+| `Wait.untilIdle(maxTicks, idleChecks)` | Until the player has stopped moving and animating for `idleChecks` ticks in a row |
+| `Wait.xpDrop()` | Until the next experience drop |
+| `Wait.sequence(step, step, ...)` | Runs steps in order, each performing its own wait |
+
+`Wait.sequence` is how Java writes "click, wait, click, wait" without blocking.
+Each step is a lambda that acts, then returns its wait, or `null` for none. A
+step only runs once the previous wait has finished, so it sees the game as it is
+by then:
+
+```java
+return Wait.sequence(
+    () -> { interactClosestObject("Portal", "Enter", 30); return Wait.ticks(3, 120); },
+    () -> surge() ? Wait.ticks(1) : null,
+    () -> { interactClosestObject("Portal", "Enter", 30); return Wait.untilIdle(10, 2); });
+```
+
+### Java-friendly calls
+
+Some Kotlin API members take a `Tile`, which compiles to a mangled name Java
+cannot call. Use these instead:
+
+- `getLocalPlayer().getTileX()` / `getTileY()`, and the same on any NPC, player
+  or scene object
+- `walkToTile(x, y)`, `walkToTile(x, y, minimap)`, `diveToTile(x, y)`
+- `isLoggedIn()` and `isPlayerLoading()`
+- `InstanceSystem.startInstance()`, `rejoinInstance()`, `hasOngoingInstance()`
+- `getMiningStamina()`: mining stamina in points
+- `getVarps().getVar(id)` and `getVarps().getVarBit(id)` for any player var
 
 ## 3. The one habit that matters
 
