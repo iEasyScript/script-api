@@ -39,14 +39,14 @@ repositories {
 dependencies {
     compileOnly("com.projectx:projectx-engine-api:1.1.0")
     compileOnly("com.projectx:projectx-core:1.1.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 }
 ```
 
 `compileOnly` is deliberate. The engine already has these classes loaded, so
 bundling them into your script jar would shadow the running engine.
 
-Build with JDK 25 and Kotlin 2.3.20 to match the engine. Java scripts extend
+Build with JDK 25 and Kotlin 2.4.0 to match the engine, and edit in IntelliJ IDEA 2026.1 or newer: older IDEs cannot read Kotlin 2.4 classes and show every API import as unresolved. Java scripts extend
 `JavaScript` rather than `Script`; the guide explains why.
 
 The engine loads script jars from `~/.projectx/scripts/`.

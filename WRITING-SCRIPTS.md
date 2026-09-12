@@ -15,6 +15,11 @@ which has one working script in each language, and open it in IntelliJ IDEA. The
 build downloads the API and, if needed, JDK 25 itself. Or build the same structure
 yourself:
 
+**Use IntelliJ IDEA 2026.1 or newer.** The API is built with Kotlin 2.4, and older
+IDEs cannot read its classes: every `com.projectx` import shows as
+`Cannot resolve symbol` even though `./gradlew build` succeeds. Update through
+the JetBrains Toolbox or Help → Check for Updates.
+
 ```
 my-scripts/
 ├── build.gradle.kts
@@ -24,7 +29,7 @@ my-scripts/
 └── src/main/java/...      <- Java scripts
 ```
 
-The build file needs Kotlin 2.3.20 and JVM toolchain 25 to match the engine, the
+The build file needs Kotlin 2.4.0 and JVM toolchain 25 to match the engine, the
 `java` plugin if you want Java scripts, the API as `compileOnly`, and coroutines.
 The API is served from the script-api GitHub releases, so it needs its own
 repository entry:
@@ -32,7 +37,7 @@ repository entry:
 ```kotlin
 plugins {
     java
-    kotlin("jvm") version "2.3.20"
+    kotlin("jvm") version "2.4.0"
 }
 
 repositories {
@@ -53,7 +58,7 @@ dependencies {
     val projectxApi = providers.gradleProperty("projectxApiVersion").get()
     compileOnly("com.projectx:projectx-engine-api:$projectxApi")
     compileOnly("com.projectx:projectx-core:$projectxApi")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 }
 ```
 
