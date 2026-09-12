@@ -37,9 +37,15 @@ The engine loads script jars from `~/.projectx/scripts/`.
 
 ## Where to start
 
-[community-scripts](https://github.com/iEasyScript/community-scripts) is a
-working project wired up exactly this way. Clone it, drop the jars in `libs/`,
-and you have a build that compiles.
+Read [WRITING-SCRIPTS.md](WRITING-SCRIPTS.md) for the full guide, from an empty
+folder to a script running in the client.
+
+[script-template](https://github.com/iEasyScript/script-template) is a working
+project wired up exactly this way, with one complete example script. Clone it,
+drop the jars in `libs/`, and you have a build that compiles.
+
+[community-scripts](https://github.com/iEasyScript/community-scripts) is the
+shared collection, if you would rather contribute than publish your own.
 
 ## Versioning
 
