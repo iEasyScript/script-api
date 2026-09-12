@@ -15,15 +15,30 @@ Each release carries two jars:
 | `projectx-engine-api` | The script API: script types, the action and event API, game entities, the overlay DSL |
 | `projectx-core` | Shared types scripts use, including tiles, coordinates and the cache library |
 
-Download them from [Releases](https://github.com/iEasyScript/script-api/releases).
+They are attached to each [release](https://github.com/iEasyScript/script-api/releases).
+You do not need to download them by hand: point Gradle at the releases and it
+fetches them like any other dependency.
 
 ## Using it
 
-Put the jars in a `libs/` directory and depend on them:
-
 ```kotlin
+repositories {
+    mavenCentral()
+    exclusiveContent {
+        forRepository {
+            ivy {
+                url = uri("https://github.com/iEasyScript/script-api/releases/download")
+                patternLayout { artifact("v[revision]/[artifact]-[revision].[ext]") }
+                metadataSources { artifact() }
+            }
+        }
+        filter { includeGroup("com.projectx") }
+    }
+}
+
 dependencies {
-    compileOnly(fileTree("libs") { include("*.jar") })
+    compileOnly("com.projectx:projectx-engine-api:1.1.0")
+    compileOnly("com.projectx:projectx-core:1.1.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
 }
 ```
@@ -42,8 +57,8 @@ Read [WRITING-SCRIPTS.md](WRITING-SCRIPTS.md) for the full guide, from an empty
 folder to a script running in the client.
 
 [script-template](https://github.com/iEasyScript/script-template) is a working
-project wired up exactly this way, with one complete example script. Clone it,
-drop the jars in `libs/`, and you have a build that compiles.
+project wired up exactly this way, with an example script in each language. Clone
+it, open it in IntelliJ, and you have a build that compiles.
 
 [community-scripts](https://github.com/iEasyScript/community-scripts) is the
 shared collection, if you would rather contribute than publish your own.

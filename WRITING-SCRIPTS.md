@@ -2,7 +2,7 @@
 
 Scripts can be written in **Kotlin or Java**. This guide covers both, from an
 empty folder to a script running in the client. Everything compiles against the
-published API jars — no engine source needed.
+published API — no engine source needed.
 
 If you are choosing: Kotlin gives you the API directly and reads more cleanly.
 Java is fully supported through a small base class that keeps it safe. The two
@@ -10,21 +10,24 @@ can live in the same project and the same jar.
 
 ## 1. Set up a project
 
-You need JDK 25. Clone the [starter template](https://github.com/iEasyScript/script-template),
-which has one working script in each language, or build the same structure yourself:
+Clone the [starter template](https://github.com/iEasyScript/script-template),
+which has one working script in each language, and open it in IntelliJ IDEA. The
+build downloads the API and, if needed, JDK 25 itself. Or build the same structure
+yourself:
 
 ```
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── libs/                  <- the two API jars go here
+├── gradle.properties      <- projectxApiVersion=1.1.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
 
 The build file needs Kotlin 2.3.20 and JVM toolchain 25 to match the engine, the
-`java` plugin if you want Java scripts, the API jars as `compileOnly`, and
-coroutines:
+`java` plugin if you want Java scripts, the API as `compileOnly`, and coroutines.
+The API is served from the script-api GitHub releases, so it needs its own
+repository entry:
 
 ```kotlin
 plugins {
@@ -32,8 +35,24 @@ plugins {
     kotlin("jvm") version "2.3.20"
 }
 
+repositories {
+    mavenCentral()
+    exclusiveContent {
+        forRepository {
+            ivy {
+                url = uri("https://github.com/iEasyScript/script-api/releases/download")
+                patternLayout { artifact("v[revision]/[artifact]-[revision].[ext]") }
+                metadataSources { artifact() }
+            }
+        }
+        filter { includeGroup("com.projectx") }
+    }
+}
+
 dependencies {
-    compileOnly(fileTree("libs") { include("*.jar") })
+    val projectxApi = providers.gradleProperty("projectxApiVersion").get()
+    compileOnly("com.projectx:projectx-engine-api:$projectxApi")
+    compileOnly("com.projectx:projectx-core:$projectxApi")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
 }
 ```
