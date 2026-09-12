@@ -17,7 +17,7 @@ which has one working script in each language, or build the same structure yours
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── libs/                  <- the three API jars go here
+├── libs/                  <- the two API jars go here
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```

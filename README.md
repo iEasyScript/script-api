@@ -8,13 +8,12 @@ can build scripts without the engine source.
 
 ## What is published
 
-Each release carries three jars:
+Each release carries two jars:
 
 | Jar | What it is |
 |---|---|
 | `projectx-engine-api` | The script API: script types, the action and event API, game entities, the overlay DSL |
 | `projectx-core` | Shared types scripts use, including tiles, coordinates and the cache library |
-| `projectx-official-scripts` | First-party scripts, for community scripts that build on them |
 
 Download them from [Releases](https://github.com/iEasyScript/script-api/releases).
 
