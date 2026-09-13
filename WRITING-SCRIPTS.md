@@ -24,7 +24,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.4.0
+├── gradle.properties      <- projectxApiVersion=1.5.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -149,6 +149,7 @@ accident.
 | `Wait.untilIdle(maxTicks, idleChecks)` | Until the player has stopped moving and animating for `idleChecks` ticks in a row |
 | `Wait.untilStoppedMoving(maxTicks, stillChecks)` | Until the player has stopped moving for `stillChecks` ticks in a row, ignoring animation: use after clicking a rock, altar or anything you walk to and keep working at |
 | `Wait.xpDrop()` | Until the next experience drop |
+| `Wait.webWalk(x, y, plane)` | Walks there from anywhere on the world map, opening doors on the way; see [Walking anywhere](#walking-anywhere-the-web-walker) |
 | `Wait.ticks(ticks, minJitter, maxJitter)` | Game ticks plus a jitter picked between `minJitter` and `maxJitter` ms |
 | `Wait.sequence(step, step, ...)` | Runs steps in order, each performing its own wait |
 | `Wait.loop(step)` | Runs a step again and again, performing its wait each time, until it returns `null` |
@@ -226,9 +227,68 @@ Use these instead of writing your own:
 | `isPlayerIdle()`, `isPlayerBusy()`, `isDiveReady()` | Player state checks |
 | `npc.headbarFill(type)` | The current fill of an NPC's or player's headbar of that type, or -1 while it is not shown |
 
+| `getVarps().getVar(id)` / `getVarps().getVarBit(id)` | Any player var |
+
 If a script of yours needs a general helper that is not here, ask for it in
 the API rather than keeping a private copy.
-- `getVarps().getVar(id)` and `getVarps().getVarBit(id)` for any player var
+
+### Walking anywhere: the web walker
+
+`walkToTile` clicks one tile, so it only reaches places the game can path to in
+one go. The web walker plans the whole route from the game cache's collision
+data and walks it: it clicks ahead along the route, opens closed doors on the
+way, and plans again if you drift off or stop moving. Planning runs off the
+game thread, so a long route never freezes the client.
+
+Java returns it as a wait. Pass a callback to find out how it ended:
+
+```java
+return Wait.webWalk(3185, 3436, 0, 2, result -> {
+    if (!result.isSuccess()) {
+        System.out.println("Could not walk to the bank: " + result);
+    }
+});
+```
+
+Kotlin calls it directly and gets the result back:
+
+```kotlin
+val result = webWalk(Tile.of(3185, 3436, 0), arriveDistance = 2)
+if (result.status != WebWalkStatus.ARRIVED) println("Could not walk to the bank: $result")
+```
+
+In a state machine, add it as a traversal node:
+
+```kotlin
+Traversal.traversal(next = Banking(), finishedCondition = { bank.isOpen }) {
+    webWalk(Tile.of(3185, 3436, 0))
+    interactObj(name = "Bank booth", action = "Bank") { bank.isOpen }
+}
+```
+
+The arrive distance is how close counts as there, in tiles with diagonals
+counting as one; it defaults to 2. Every walk ends with a `WebWalkResult`: its
+`status` says what happened and `message` says why.
+
+| Status | Meaning |
+|---|---|
+| `ARRIVED` | Within the arrive distance of the destination |
+| `NO_PATH` | No walkable route: walled off, or it needs stairs, a ladder, a shortcut or a teleport |
+| `TOO_FAR` | The search gave up before reaching it |
+| `OTHER_FLOOR` | The destination is on a different plane from the player |
+| `NOT_IN_WORLD` | The player or the destination is inside an instance |
+| `STUCK` | The player stopped making progress, even after planning again |
+| `STOPPED` | The script stopped while walking |
+
+To look at a route without walking it, use `WebWalker.findPathAsync(startX,
+startY, destX, destY, plane)`, which completes with a result whose `getPath()`
+holds every tile (`getX(i)`, `getY(i)`, `crossesDoor(i)`). Kotlin scripts can
+suspend on `WebWalker.findPath(this, from, to)` instead. Never call the blocking
+`WebWalker.findPath(...)` from a script body: scripts run on the game thread.
+
+Routes stay on one plane for now and do not use stairs, ladders, shortcuts,
+lodestones or teleports. Teleport close first (a lodestone, say), then web walk
+the rest.
 
 ## 3. The one habit that matters
 
