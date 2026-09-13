@@ -24,7 +24,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.6.0
+├── gradle.properties      <- projectxApiVersion=1.6.1
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -301,7 +301,9 @@ Apart from lodestones, routes stay on one plane and do not use stairs, ladders,
 shortcuts or other teleports.
 
 `Lodestone.X.isUnlocked()` tells you whether a lodestone is unlocked, and
-`useLodestone(Lodestone.X)` teleports to one yourself. Lunar Isle, Bandit Camp
+`useLodestone(Lodestone.X)` teleports to one yourself. `openLodestoneMap()`
+opens the lodestone network from the minimap (either minimap layout) and
+`isLodestoneUiOpen` tells you when it is open. Lunar Isle, Bandit Camp
 and the City of Um report locked, because no unlock var is known for them; the
 walker never picks them.
 
