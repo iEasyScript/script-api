@@ -24,7 +24,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.5.0
+├── gradle.properties      <- projectxApiVersion=1.6.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -149,7 +149,7 @@ accident.
 | `Wait.untilIdle(maxTicks, idleChecks)` | Until the player has stopped moving and animating for `idleChecks` ticks in a row |
 | `Wait.untilStoppedMoving(maxTicks, stillChecks)` | Until the player has stopped moving for `stillChecks` ticks in a row, ignoring animation: use after clicking a rock, altar or anything you walk to and keep working at |
 | `Wait.xpDrop()` | Until the next experience drop |
-| `Wait.webWalk(x, y, plane)` | Walks there from anywhere on the world map, opening doors on the way; see [Walking anywhere](#walking-anywhere-the-web-walker) |
+| `Wait.webWalk(x, y, plane)` | Walks there from anywhere on the world map, opening doors and using unlocked lodestones on the way; see [Walking anywhere](#walking-anywhere-the-web-walker) |
 | `Wait.ticks(ticks, minJitter, maxJitter)` | Game ticks plus a jitter picked between `minJitter` and `maxJitter` ms |
 | `Wait.sequence(step, step, ...)` | Runs steps in order, each performing its own wait |
 | `Wait.loop(step)` | Runs a step again and again, performing its wait each time, until it returns `null` |
@@ -240,6 +240,12 @@ data and walks it: it clicks ahead along the route, opens closed doors on the
 way, and plans again if you drift off or stop moving. Planning runs off the
 game thread, so a long route never freezes the client.
 
+On a long walk it also considers the lodestones you have unlocked: it compares
+walking the whole way with teleporting to one of the three unlocked lodestones
+nearest the destination and walking from there (a teleport counts as about 30
+tiles of walking), and teleports when that is quicker. If the lodestone map does
+not open or the teleport does not arrive, it walks instead.
+
 Java returns it as a wait. Pass a callback to find out how it ended:
 
 ```java
@@ -267,8 +273,13 @@ Traversal.traversal(next = Banking(), finishedCondition = { bank.isOpen }) {
 ```
 
 The arrive distance is how close counts as there, in tiles with diagonals
-counting as one; it defaults to 2. Every walk ends with a `WebWalkResult`: its
-`status` says what happened and `message` says why.
+counting as one; it defaults to 2. To walk without lodestones, pass
+`useLodestones = false` in Kotlin, or `false` after the callback in Java:
+`Wait.webWalk(x, y, plane, 2, null, false)`.
+
+Every walk ends with a `WebWalkResult`: its `status` says what happened,
+`message` says why, and `lodestone` names the lodestone it teleported to, if it
+used one.
 
 | Status | Meaning |
 |---|---|
@@ -286,9 +297,13 @@ holds every tile (`getX(i)`, `getY(i)`, `crossesDoor(i)`). Kotlin scripts can
 suspend on `WebWalker.findPath(this, from, to)` instead. Never call the blocking
 `WebWalker.findPath(...)` from a script body: scripts run on the game thread.
 
-Routes stay on one plane for now and do not use stairs, ladders, shortcuts,
-lodestones or teleports. Teleport close first (a lodestone, say), then web walk
-the rest.
+Apart from lodestones, routes stay on one plane and do not use stairs, ladders,
+shortcuts or other teleports.
+
+`Lodestone.X.isUnlocked()` tells you whether a lodestone is unlocked, and
+`useLodestone(Lodestone.X)` teleports to one yourself. Lunar Isle, Bandit Camp
+and the City of Um report locked, because no unlock var is known for them; the
+walker never picks them.
 
 ## 3. The one habit that matters
 
