@@ -400,7 +400,9 @@ Available types are `BooleanConfigItem`, `IntConfigItem`, `StringConfigItem`,
 
 That builds the jar and copies it to `~/.projectx/scripts/`, which is where the
 engine loads script jars from. Kotlin and Java scripts ship in the same jar and
-are discovered the same way. Start the engine and your script appears in the list.
+are discovered the same way. Start the engine, or click **Reload** in the
+overlay's Library tab, then find your script in the **Store** tab under **Your
+scripts** and click **Add** to put it in your Library.
 
 While iterating, rebuild and hot-reload rather than restarting the client.
 
@@ -418,3 +420,7 @@ it moves.
 
 If you would rather share than sell, open a pull request against
 [community-scripts](https://github.com/iEasyScript/community-scripts).
+
+[SHARING-SCRIPTS.md](SHARING-SCRIPTS.md) covers handing out or selling a jar in
+full: how the engine loads it, building a jar that works on someone else's PC,
+obfuscation, and what buyers should know.

@@ -63,6 +63,10 @@ it, open it in IntelliJ, and you have a build that compiles.
 [community-scripts](https://github.com/iEasyScript/community-scripts) is the
 shared collection, if you would rather contribute than publish your own.
 
+[SHARING-SCRIPTS.md](SHARING-SCRIPTS.md) explains handing out or selling your
+script as a jar: how people install it, how to build one that works on their PC,
+and what to know before you charge for it.
+
 ## Versioning
 
 The API tracks the engine build. A script compiled against one release is not
