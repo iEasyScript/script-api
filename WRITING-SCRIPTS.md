@@ -24,7 +24,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.2.0
+├── gradle.properties      <- projectxApiVersion=1.3.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -148,7 +148,10 @@ accident.
 | `Wait.whileTrue(condition, timeoutMs)` | While the condition is true, or the timeout |
 | `Wait.untilIdle(maxTicks, idleChecks)` | Until the player has stopped moving and animating for `idleChecks` ticks in a row |
 | `Wait.xpDrop()` | Until the next experience drop |
+| `Wait.ticks(ticks, minJitter, maxJitter)` | Game ticks plus a jitter picked between `minJitter` and `maxJitter` ms |
 | `Wait.sequence(step, step, ...)` | Runs steps in order, each performing its own wait |
+| `Wait.loop(step)` | Runs a step again and again, performing its wait each time, until it returns `null` |
+| `Wait.abort()` | Returned from a step: ends the sequences and loops around it |
 
 `Wait.sequence` is how Java writes "click, wait, click, wait" without blocking.
 Each step is a lambda that acts, then returns its wait, or `null` for none. A
@@ -162,6 +165,33 @@ return Wait.sequence(
     () -> { interactClosestObject("Portal", "Enter", 30); return Wait.untilIdle(10, 2); });
 ```
 
+A step can return another `Wait.sequence` or a `Wait.loop`; it runs in full
+before the next step. A loop is the non-blocking `while`:
+
+```java
+return Wait.loop(() -> {
+    if (conduitIsFull()) {
+        return null;                  // ends the loop
+    }
+    conduit.interactOrFirst("Repair");
+    return Wait.ticks(3);
+});
+```
+
+Steps can run seconds after `onLoop()` returned. If your script keeps a snapshot
+of the game (NPCs, objects, inventory) in fields, refresh it in
+`beforeEachStep()`, which the engine calls before every step:
+
+```java
+@Override
+protected void beforeEachStep() {
+    refreshSnapshot();
+}
+```
+
+The engine also pauses `Script.LOOP_PASS_MILLIS` ms after every loop pass, on
+top of the wait you returned.
+
 ### Java-friendly calls
 
 Some Kotlin API members take a `Tile`, which compiles to a mangled name Java
@@ -173,6 +203,29 @@ cannot call. Use these instead:
 - `isLoggedIn()` and `isPlayerLoading()`
 - `InstanceSystem.startInstance()`, `rejoinInstance()`, `hasOngoingInstance()`
 - `getMiningStamina()`: mining stamina in points
+
+### Positions, interaction and items
+
+Use these instead of writing your own:
+
+| Call | What it gives you |
+|---|---|
+| `thing.getCenterX()` / `getCenterY()` | Centre of an NPC, player or object's footprint, in tiles |
+| `thing.distanceTo(x, y)` | Distance in tiles from that centre |
+| `playerDistanceTo(x, y)` | Distance from the player |
+| `closestObject(list)` / `closestEntity(list)` | The one nearest the player |
+| `isTileSafe(x, y, markers, safeDistance)` | Whether a tile is clear of `{x, y}` floor markers |
+| `nearestSafeTile(markers, safeDistance, range)` | Where to step to get clear, as `{x, y}` |
+| `tileBeside(object)` | The tile just outside an object's footprint nearest you |
+| `thing.interactOrFirst(option)` | The named option, or the first one if it is missing |
+| `actionBarItemSlot(itemIds...)` | The action bar slot holding one of those items |
+| `useInventoryOrActionBarItem(option, itemIds...)` | Use an item from the pack, or the action bar if it is not there |
+| `getInventory().findByNameContaining(text)` | The first item whose name contains `text` |
+| `getInventory().getUsedSlots()` | How many slots are filled |
+| `isPlayerIdle()`, `isPlayerBusy()`, `isDiveReady()` | Player state checks |
+
+If a script of yours needs a general helper that is not here, ask for it in
+the API rather than keeping a private copy.
 - `getVarps().getVar(id)` and `getVarps().getVarBit(id)` for any player var
 
 ## 3. The one habit that matters
