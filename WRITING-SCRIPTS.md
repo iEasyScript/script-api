@@ -24,7 +24,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.3.0
+├── gradle.properties      <- projectxApiVersion=1.4.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -147,6 +147,7 @@ accident.
 | `Wait.until(condition, timeoutMs)` | Until the condition is true, or the timeout |
 | `Wait.whileTrue(condition, timeoutMs)` | While the condition is true, or the timeout |
 | `Wait.untilIdle(maxTicks, idleChecks)` | Until the player has stopped moving and animating for `idleChecks` ticks in a row |
+| `Wait.untilStoppedMoving(maxTicks, stillChecks)` | Until the player has stopped moving for `stillChecks` ticks in a row, ignoring animation: use after clicking a rock, altar or anything you walk to and keep working at |
 | `Wait.xpDrop()` | Until the next experience drop |
 | `Wait.ticks(ticks, minJitter, maxJitter)` | Game ticks plus a jitter picked between `minJitter` and `maxJitter` ms |
 | `Wait.sequence(step, step, ...)` | Runs steps in order, each performing its own wait |
@@ -223,6 +224,7 @@ Use these instead of writing your own:
 | `getInventory().findByNameContaining(text)` | The first item whose name contains `text` |
 | `getInventory().getUsedSlots()` | How many slots are filled |
 | `isPlayerIdle()`, `isPlayerBusy()`, `isDiveReady()` | Player state checks |
+| `npc.headbarFill(type)` | The current fill of an NPC's or player's headbar of that type, or -1 while it is not shown |
 
 If a script of yours needs a general helper that is not here, ask for it in
 the API rather than keeping a private copy.
