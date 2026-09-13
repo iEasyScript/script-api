@@ -5,8 +5,14 @@ empty folder to a script running in the client. Everything compiles against the
 published API — no engine source needed.
 
 If you are choosing: Kotlin gives you the API directly and reads more cleanly.
-Java is fully supported through a small base class that keeps it safe. The two
-can live in the same project and the same jar.
+Java is fully supported through a small base class that keeps it safe. Nothing
+in the API is limited to one language:
+
+- every Kotlin helper that waits has a Java `Wait` of the same name
+- every call that takes a `Tile` has a form that takes coordinates
+- Java has its own overlay builder and state machine
+
+The two languages can live in the same project and the same jar.
 
 ## 1. Set up a project
 
@@ -24,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.7.0
+├── gradle.properties      <- projectxApiVersion=1.8.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -118,9 +124,11 @@ public class ExampleJavaWoodcutter extends JavaScript {
 ```
 
 Import the API as static methods: `import static com.projectx.script.api.APIKt.*;`
+For overlays, also `import static com.projectx.ui.backend.dsl.Overlay.*;` (see
+[Show an overlay](#6-show-an-overlay)).
 
-`onStart()`, `onStop()`, `onEvent()` and `render()` are optional overrides in
-both languages.
+`onStart()`, `onStop()`, `onEvent()`, `render()` and `shouldInterrupt()` are
+optional overrides in both languages.
 
 ### Why Java returns a Wait instead of waiting
 
@@ -149,6 +157,8 @@ accident.
 | `Wait.untilIdle(maxTicks, idleChecks)` | Until the player has stopped moving and animating for `idleChecks` ticks in a row |
 | `Wait.untilStoppedMoving(maxTicks, stillChecks)` | Until the player has stopped moving for `stillChecks` ticks in a row, ignoring animation: use after clicking a rock, altar or anything you walk to and keep working at |
 | `Wait.xpDrop()` | Until the next experience drop |
+| `Wait.event(predicate, timeoutMs)` | Until an event the predicate accepts arrives |
+| `Wait.chatContaining(type, text)` | Until a chat message of that type containing the text |
 | `Wait.webWalk(x, y, plane)` | Walks there from anywhere on the world map, opening doors and using unlocked lodestones on the way; see [Walking anywhere](#walking-anywhere-the-web-walker) |
 | `Wait.ticks(ticks, minJitter, maxJitter)` | Game ticks plus a jitter picked between `minJitter` and `maxJitter` ms |
 | `Wait.sequence(step, step, ...)` | Runs steps in order, each performing its own wait |
@@ -194,11 +204,19 @@ protected void beforeEachStep() {
 The engine also pauses `Script.LOOP_PASS_MILLIS` ms after every loop pass, on
 top of the wait you returned.
 
+### Reacting to danger mid-wait: shouldInterrupt
+
 To react to something urgent in the middle of a long wait, override
-`shouldInterrupt()`. The engine checks it about every 50 ms while any wait runs
-and before every step; returning `true` abandons the wait and the sequences and
-loops around it, and `onLoop()` runs straight away. Keep it cheap, and make it
-false again once you are handling the situation, or every wait is cut short:
+`shouldInterrupt()`. It works in both languages:
+
+- **Checking:** the engine checks it about every 50 ms while the script waits.
+- **Java:** returning `true` abandons the current wait and the sequences and
+  loops around it, and `onLoop()` runs straight away.
+- **Kotlin:** returning `true` cancels the current `loop()` pass at its next
+  wait, and the next pass starts straight away.
+
+Keep it cheap. Make it false again once you are handling the situation, or every
+wait is cut short.
 
 ```java
 @Override
@@ -207,17 +225,102 @@ protected boolean shouldInterrupt() {
 }
 ```
 
+```kotlin
+override fun shouldInterrupt() = standingInFloorMarker() && !alreadyDodging()
+```
+
+Kotlin can also guard a single block rather than the whole pass.
+`interruptWhen(condition) { ... }` runs the block, cancels it once the condition
+holds, and returns `null` if it was cancelled:
+
+```kotlin
+val mined = interruptWhen({ standingInFloorMarker() }) {
+    rock.interact("Mine")
+    waitForXPDrop()
+    true
+}
+if (mined == null) dodge()
+```
+
+### Every Kotlin helper that waits has a Wait
+
+Kotlin helpers that wait are `suspend` functions, which Java cannot call. Each
+one has a `Wait` factory of the same name that the engine runs for you. When
+the helper reports an outcome, pass an `onResult` callback. The engine calls it
+when the helper finishes, and a later step can read what it stored:
+
+```java
+private boolean summoned;
+
+@Override
+public Wait onLoop() {
+    return Wait.sequence(
+        () -> Wait.familiarSummonFamiliar(Familiar.SPIRIT_WOLF, ok -> summoned = ok),
+        () -> summoned ? Wait.castAndWaitForCd(Ability.SURGE) : Wait.abort());
+}
+```
+
+`shouldInterrupt()` cuts these waits short like any other. When it does,
+`onResult` is not called.
+
+| Kotlin | Java |
+|---|---|
+| `waitForEvent`, `waitForChatContaining`, `waitForXPDrop` | `Wait.event`, `Wait.chatContaining`, `Wait.xpDrop` |
+| `waitUntilIdle`, `waitUntilStoppedMoving` | `Wait.untilIdle`, `Wait.untilStoppedMoving` |
+| `waitUntilNotMoving`, `waitUntilNotAniMoving` | `Wait.untilNotMoving`, `Wait.untilNotAniMoving` |
+| `delayTicks`, `delayBetween`, `delay(mean, variance)` | `Wait.ticks`, `Wait.between`, `Wait.ms` |
+| `pauseOthersFor` | `Wait.pauseOthersFor` |
+| `webWalk`, `useLodestone`, `teleportWithGroupSystem` | `Wait.webWalk`, `Wait.useLodestone`, `Wait.teleportWithGroupSystem` |
+| `randomizedWorldHop`, `randomizedWorldHopQuick`, `checkWorldPop` | `Wait.randomizedWorldHop`, `Wait.randomizedWorldHopQuick`, `Wait.checkWorldPop` |
+| `clickKey`, `findAndPickupItems`, `checkPorter` | `Wait.clickKey`, `Wait.findAndPickupItems`, `Wait.checkPorter` |
+| `togglePrayer`, `toggleQuickPrayers` | `Wait.togglePrayer`, `Wait.toggleQuickPrayers` |
+| `castAndWaitForCd`, `castWithAdren`, `castIf`, `smartCast`, `castWithEffectStacks` | `Wait.` + the same names |
+| `makeX`, `makeXSelect`, `makeXConfirm`, `selectMakeCategory`, `makeXReaction` | `Wait.` + the same names |
+| `smithSetQuantity`, `smithSelectTier`, `smithSelectItem`, `smithMake` | `Wait.` + the same names |
+| `familiarSummonFamiliar`, `familiarRenewFromBank`, `familiarRenewFromInterface`, `familiarRecall`, `familiarDismiss`, `familiarTakeScrolls`, `familiarCastSpecial` | `Wait.` + the same names |
+| `bobGiveAllItems`, `bobTakeAllItems`, `bobGiveItem`, `bobTake` | `Wait.` + the same names |
+| `bobStore`, `bobWithdraw` (pairs) | `Wait.bobStoreById` / `bobStoreByName`, `Wait.bobWithdrawById` / `bobWithdrawByName` (a `Map` of amounts) |
+| `joinInstance`, `confirmInstanceDialogue`, `startOrRejoinInstance` | `Wait.` + the same names |
+
+Kotlin lambdas become Java types in these factories: a condition is a
+`BooleanSupplier`, and a name match is a `Predicate<String>`.
+
 ### Java-friendly calls
 
-Some Kotlin API members take a `Tile`, which compiles to a mangled name Java
-cannot call. Use these instead:
+Kotlin's `Tile` is a value class, so any member that takes or returns one
+compiles to a name Java cannot call. Every such call has a coordinate form:
 
-- `getLocalPlayer().getTileX()` / `getTileY()`, and the same on any NPC, player
-  or scene object
-- `walkToTile(x, y)`, `walkToTile(x, y, minimap)`, `diveToTile(x, y)`
-- `isLoggedIn()` and `isPlayerLoading()`
-- `InstanceSystem.startInstance()`, `rejoinInstance()`, `hasOngoingInstance()`
-- `getMiningStamina()`: mining stamina in points
+| Kotlin | Java |
+|---|---|
+| `thing.tile` | `thing.getTileX()`, `getTileY()`, `getPlane()` on NPCs, players, scene objects, ground items, lodestones, `TileArea` and the `ManualGroundItem` event; `getCenterX()`, `getCenterY()`, `getPlane()` on `DangerZone` |
+| `walkTo(tile, minimap)`, `dive(tile)` | `walkToTile(x, y[, plane][, minimap])`, `diveToTile(x, y[, plane])` |
+| `findClosestObjectToTile(tile, ...)` and `findClosestReachableObjectToTile`, `findClosestObjectToTileWithOption` | the same names with `(x, y, plane, ...)` |
+| `interactClosestReachableObjectToTile(tile, ...)` | `interactClosestReachableObjectToTile(x, y, plane, ...)` |
+| `getAllObjectsWithinRange(tile, range)` | `getAllObjectsWithinRange(x, y, plane, range)` |
+| `calculateClosestSafeTile(tile, ...)`, `calculateClosestReachableSafeTile(tile, ...)` | the same names with `(x, y, plane, ...)` |
+| `bresenhamLos(start, end, obstacles)` | `bresenhamLos(startX, startY, endX, endY, obstacles)` |
+| `DangerZone(tile, radius)`, `TileArea(tile, sizeX, sizeY)` | `new DangerZone(x, y, plane, radius)`, `new TileArea(x, y, plane, sizeX, sizeY)` |
+| `Area.Rectangular(tile, tile)`, `Area.Circular(tile, radius)`, `Area.Polygonal(tiles)` | `new Area.Rectangular(x1, y1, x2, y2, plane)`, `new Area.Circular(x, y, plane, radius)`, `new Area.Polygonal(xs, ys, plane)` |
+| `area.contains(tile)` | `area.contains(x, y, plane)` |
+| `area.getRandomCoordinate()`, `getRandomWalkableCoordinate()`, `getCentroid()` | `area.randomTile()`, `randomWalkableTile()`, `centreTile()`, which return a `Tile` object with `getX()`, `getY()` and `getLevel()` |
+| drawing `tile(tile, color)`, `tileArea`, `textOnTile`, `imageOnTile` | the same names with `(x, y, plane, ...)` |
+
+Also:
+
+- **Default arguments:** a Kotlin parameter with a default is optional from
+  Java too, so `interactClosestObject("Tree", "Chop down")` works without a
+  range.
+- **Static members:** a class's companion members are called statically, for
+  example `Bank.doBankAction(id)`, `InstanceSystem.hasOngoingInstance()`,
+  `Equipment.Slot.getItem(slot)`, `Familiar.getName(id)` and
+  `WebWalker.findPathAsync(...)`.
+- **Singleton objects:** a standalone object is reached through `INSTANCE`, for
+  example `MakeX.INSTANCE.isOpen()`, `Smithing.INSTANCE.getQuantity()`,
+  `ImGuiColors.INSTANCE.getWHITE()`. It stays that way so that script jars
+  already compiled against these objects keep loading.
+- **Other helpers:** `isLoggedIn()` and `isPlayerLoading()`;
+  `InstanceSystem.startInstance()`, `rejoinInstance()`, `hasOngoingInstance()`;
+  and `getMiningStamina()`, mining stamina in points.
 
 ### Positions, interaction and items
 
@@ -337,8 +440,10 @@ Every wait takes a timeout, so a missed interaction cannot hang the script.
 | `delayUntil(timeout) { ... }` | `Wait.until(() -> ..., timeout)` | the predicate becomes true |
 | `delayWhile(timeout) { ... }` | `Wait.whileTrue(() -> ..., timeout)` | the predicate becomes false |
 | `waitForXPDrop()` | `Wait.xpDrop()` | experience is granted |
-| `waitForEvent(timeout) { ... }` | — | a matching event arrives |
+| `waitForEvent(timeout) { ... }` | `Wait.event(e -> ..., timeout)` | a matching event arrives |
+| `waitUntilIdle(maxTicks, checks)` | `Wait.untilIdle(maxTicks, checks)` | the player stops moving and animating |
 | `delay(mean, variance)` | `Wait.ms(mean, variance)` | a randomised pause elapses |
+| `delayTicks(ticks, jitterMs)` | `Wait.ticks(ticks, jitterMs)` | game ticks elapse |
 
 The second habit: **never interact without a minimum interval.** A loop that
 interacts and returns is re-entered on the next tick. Without a delay on every
@@ -370,8 +475,45 @@ private object Gathering : State<MyScript>() {
 `checkNext()` returns the next state or null to stay put. `stateLoop()` is that
 state's body.
 
-There is no Java equivalent of `StateMachineScript`. In Java, model phases with
-an enum field and switch on it inside `onLoop()`.
+Java scripts extend `JavaStateMachineScript` and write each phase as a
+`JavaState`, most neatly as enum constants. `checkNext()` works the same way,
+and `onLoop()` is the phase's body, returning its wait:
+
+```java
+public class MyScript extends JavaStateMachineScript<MyScript> {
+    @Override
+    public JavaState<MyScript> getStartState() {
+        return Phase.GATHERING;
+    }
+}
+
+enum Phase implements JavaState<MyScript> {
+    GATHERING {
+        public JavaState<MyScript> checkNext(MyScript script) {
+            return getInventory().isFull() ? BANKING : null;
+        }
+
+        public Wait onLoop(MyScript script) {
+            return interactClosestObject("Tree", "Chop down") ? Wait.xpDrop() : Wait.ms(320, 200);
+        }
+    },
+    BANKING {
+        public JavaState<MyScript> checkNext(MyScript script) {
+            return getInventory().isEmpty() ? GATHERING : null;
+        }
+
+        public Wait onLoop(MyScript script) {
+            return Wait.webWalk(3185, 3436, 0);
+        }
+    }
+}
+```
+
+A state can also override `onEvent(script, event)` to see the events that
+arrive while it is current.
+
+Kotlin's `Traversal` builder, which strings walking and interaction steps into a
+state, has no Java form: in Java, write those steps as a `Wait.sequence`.
 
 ## 5. Give the user settings
 
@@ -388,11 +530,70 @@ class MyScript : Script(), ConfigurableScript {
 }
 ```
 
+```java
+public class MyScript extends JavaScript implements ConfigurableScript {
+    private final BooleanConfigItem dropLogs =
+        new BooleanConfigItem("Drop logs", "Drop instead of banking.", true);
+    private final IntConfigItem range = new IntConfigItem("Range", "Search range in tiles.", 20);
+}
+```
+
 Available types are `BooleanConfigItem`, `IntConfigItem`, `StringConfigItem`,
 `OptionsConfigItem`, `EnumConfigItem`, `InfoDisplayConfigItem` and
-`ConfigSection`. Read a value with `.value`, or `getValue()` from Java.
+`ConfigSection`. Read a value with `.value`, or `getValue()` from Java. The
+trailing constructor arguments are optional in both languages.
 
-## 6. Run it
+## 6. Show an overlay
+
+Override `render()` to draw a window of your own or to mark things in the game
+world. The engine calls it every frame, so read state there but do not act on
+it.
+
+Kotlin builds windows with `ImGuiDsl`:
+
+```kotlin
+override fun render() {
+    ImGuiDsl.window("My Script") {
+        section("Status")
+        text("Logs: $logs")
+        xpProgressBar(Skill.WOODCUTTING)
+        button("Stop") { stop() }
+    }
+    ImGuiDsl.backgroundDrawList {
+        tile(targetTile, ImGuiColors.GREEN)
+    }
+}
+```
+
+Java uses `Overlay`, whose builders take the scope as their first argument and a
+lambda for the content:
+
+```java
+import static com.projectx.ui.backend.dsl.Overlay.*;
+
+@Override
+public void render() {
+    window("My Script", w -> {
+        section(w, "Status");
+        text(w, "Logs: " + logs);
+        xpProgressBar(w, Skill.WOODCUTTING);
+        button(w, "Stop", this::stop);
+    });
+    backgroundDrawList(draw -> draw.tile(targetX, targetY, 0, ImGuiColors.INSTANCE.getGREEN()));
+}
+```
+
+`Overlay` covers the controls scripts use:
+
+| Kind | What `Overlay` has |
+|---|---|
+| Text | `text`, `section`, `separator`, `sameLine`, `spacing`, `progressBar`, `xpProgressBar`, `image` |
+| Controls | `button`, `checkbox`, `inputText`, `inputInt`, `sliderInt`, `sliderFloat`, `combo`, `selectable` |
+| Layout | `group`, `child`, `collapsingHeader`, `treeNode`, `table`, `properties` with `row` and `valueRow`, `tabBar` with `tabItem`, `listBox`, `styleColor`, `itemWidth` |
+| Window setup | `setNextWindowPos` and `setNextWindowSize`, with the flags as ints: `WINDOW_NO_RESIZE`, `WINDOW_ALWAYS_AUTO_RESIZE`, `COND_FIRST_USE_EVER` and the rest |
+| State | `persistentState`, `boolState`, `intState`, `floatState`, `stringState`, for values that last between frames |
+
+## 7. Run it
 
 ```bash
 ./gradlew installScripts
@@ -406,7 +607,7 @@ scripts** and click **Add** to put it in your Library.
 
 While iterating, rebuild and hot-reload rather than restarting the client.
 
-## 7. Distributing
+## 8. Distributing
 
 Your jar is yours. The API is published so you can build against it without the
 engine source, and nothing requires you to open-source what you write or to

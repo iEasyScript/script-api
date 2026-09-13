@@ -2,9 +2,9 @@
 
 The public API for writing scripts against the Project X engine.
 
-Scripts can be written in **Kotlin or Java**. The engine itself is closed
-source. This repository publishes the compiled API it exposes to scripts, so you
-can build scripts without the engine source.
+Scripts can be written in **Kotlin or Java**, and the whole API works from both.
+The engine itself is closed source. This repository publishes the compiled API it
+exposes to scripts, so you can build scripts without the engine source.
 
 ## What is published
 
@@ -37,8 +37,8 @@ repositories {
 }
 
 dependencies {
-    compileOnly("com.projectx:projectx-engine-api:1.7.0")
-    compileOnly("com.projectx:projectx-core:1.7.0")
+    compileOnly("com.projectx:projectx-engine-api:1.8.0")
+    compileOnly("com.projectx:projectx-core:1.8.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 }
 ```
