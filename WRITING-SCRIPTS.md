@@ -24,7 +24,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.6.1
+├── gradle.properties      <- projectxApiVersion=1.7.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -194,6 +194,19 @@ protected void beforeEachStep() {
 The engine also pauses `Script.LOOP_PASS_MILLIS` ms after every loop pass, on
 top of the wait you returned.
 
+To react to something urgent in the middle of a long wait, override
+`shouldInterrupt()`. The engine checks it about every 50 ms while any wait runs
+and before every step; returning `true` abandons the wait and the sequences and
+loops around it, and `onLoop()` runs straight away. Keep it cheap, and make it
+false again once you are handling the situation, or every wait is cut short:
+
+```java
+@Override
+protected boolean shouldInterrupt() {
+    return standingInFloorMarker() && !alreadyDodging();
+}
+```
+
 ### Java-friendly calls
 
 Some Kotlin API members take a `Tile`, which compiles to a mangled name Java
@@ -218,6 +231,8 @@ Use these instead of writing your own:
 | `closestObject(list)` / `closestEntity(list)` | The one nearest the player |
 | `isTileSafe(x, y, markers, safeDistance)` | Whether a tile is clear of `{x, y}` floor markers |
 | `nearestSafeTile(markers, safeDistance, range)` | Where to step to get clear, as `{x, y}` |
+| `isTileInZones(x, y, zones)` | Whether a tile is inside any square zone, each `{centreX, centreY, radius}`: a 3x3 marker is radius 1, a 7x7 radius 3 |
+| `safeTileOutside(zones, range, preferX, preferY)` | The nearest tile you can actually walk to outside every zone, as `{x, y}`, preferring one near `preferX, preferY` |
 | `tileBeside(object)` | The tile just outside an object's footprint nearest you |
 | `thing.interactOrFirst(option)` | The named option, or the first one if it is missing |
 | `actionBarItemSlot(itemIds...)` | The action bar slot holding one of those items |
