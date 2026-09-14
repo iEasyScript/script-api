@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.8.0
+├── gradle.properties      <- projectxApiVersion=1.9.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -281,6 +281,8 @@ public Wait onLoop() {
 | `bobGiveAllItems`, `bobTakeAllItems`, `bobGiveItem`, `bobTake` | `Wait.` + the same names |
 | `bobStore`, `bobWithdraw` (pairs) | `Wait.bobStoreById` / `bobStoreByName`, `Wait.bobWithdrawById` / `bobWithdrawByName` (a `Map` of amounts) |
 | `joinInstance`, `confirmInstanceDialogue`, `startOrRejoinInstance` | `Wait.` + the same names |
+| `typeText`, `pressKey` | `Wait.` + the same names |
+| `geOpen`, `geBuy`, `geSell`, `geAbort`, `geCollectAll`, `awaitGrandExchangePrices` | `Wait.` + the same names; `Wait.geBuyInSlot` / `geSellInSlot` to pick the slot |
 
 Kotlin lambdas become Java types in these factories: a condition is a
 `BooleanSupplier`, and a name match is a `Predicate<String>`.
@@ -424,6 +426,78 @@ opens the lodestone network from the minimap (either minimap layout) and
 `isLodestoneUiOpen` tells you when it is open. Lunar Isle, Bandit Camp
 and the City of Um report locked, because no unlock var is known for them; the
 walker never picks them.
+
+### Typing
+
+`typeText(text)` types into whatever has keyboard focus (a search box, an amount
+prompt) the way a physical keyboard does: key-down, the character the OS
+translates it to, a human-length hold, key-up, with shift held for capitals and
+typing-speed gaps between keys. `pressKey(Key.RETURN)` presses a single key the
+same way. Only letters, digits, space, tab, newline and backspace can be typed;
+`canTypeText(text)` checks first, and `typeText` returns false without pressing
+anything otherwise.
+
+`clickKey` is unchanged: it sends a bare key-down and key-up with no character,
+which is right for keybinds but types nothing into a text field.
+
+### The Grand Exchange
+
+`GrandExchange` reads the exchange from the client's own state, so offers stay
+current with the window closed. From Java its members are static:
+`GrandExchange.isOpen()`, `GrandExchange.offers()`.
+
+| Call | What it gives you |
+|---|---|
+| `GrandExchange.isOpen` | Whether the exchange window is open |
+| `GrandExchange.offers()` / `offer(slot)` | Every slot (0-7): status, `BUY`/`SELL`, item, price, quantity, completed quantity and gold |
+| `GrandExchange.activeOffers()` / `firstEmptySlot()` | Slots with an offer / the first free one, or -1 |
+| `GrandExchange.collectable(slot)` / `hasCollectable()` | Items or coins waiting to be collected |
+| `GrandExchange.isSettingUpOffer`, `setupItemId`, `setupQuantity`, `setupPrice`, `setupMarketPrice` | The buy/sell screen, including the exchange's guide price |
+| `GrandExchange.searchResults()` | The item search list, as row slot to item name |
+| `GrandExchange.itemForms(itemId)` | An item and its banknote, which the exchange treats as one item |
+| `coinPouch.count(995)` | Coins in the money pouch |
+
+An offer's `status` is `EMPTY`, `ADDING`, `ACTIVE`, `COMPLETING`, `ABORTING` or
+`FINISHED`. A finished offer `isCompleted` when everything traded and
+`isAborted` otherwise; `remainingQuantity` is what is left.
+
+Actions wait for the server's answer and return whether it worked:
+
+| Kotlin | Does |
+|---|---|
+| `geOpen()` | Opens the exchange through the nearest clerk or banker |
+| `geBuy(itemId, quantity, price)` | Searches for the item, sets quantity and price, confirms |
+| `geSell(itemId, quantity, price)` | Offers the item from the backpack, noted or not |
+| `geAbort(slot)` | Aborts an offer and waits until it has finished |
+| `geCollectAll()` | Collects every slot (coins go to the money pouch) |
+
+`geBuy` and `geSell` use the first empty slot unless you pass one. They return
+false if the window is not open, the slot is taken or locked, or the item cannot
+be found, typed or offered. The exchange can ask you to confirm a sale far below
+the guide price; that prompt is not answered for you, so the call returns false.
+
+The exchange withholds 2% of each sale, rounded down per item; items sold for
+under 50 coins and bonds are exempt. Buy limits run for four hours from the first
+purchase.
+
+Live prices come from the [RuneScape Wiki's real-time price
+API](https://prices.runescape.wiki/rs). Refresh, then read the local copy:
+
+```kotlin
+if (awaitGrandExchangePrices()) {
+    val price = GrandExchangePrices.price(itemId)   // high = instant buy, low = instant sell
+    val limit = GrandExchangePrices.item(itemId)?.buyLimit
+    val volume = GrandExchangePrices.dailyVolume(itemId)
+}
+```
+
+Set `GrandExchangePrices.userAgent` to your script's name and a contact: the wiki
+asks every API user for one. Refreshes are limited to one a minute and never
+block the game. In Java, return `Wait.awaitGrandExchangePrices()` or poll
+`GrandExchangePrices.refresh()`.
+
+The exchange state is read on the Windows client; on other platforms
+`GrandExchange.isSupported` is false and every slot reads as empty.
 
 ## 3. The one habit that matters
 
