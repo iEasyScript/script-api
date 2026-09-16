@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.9.0
+├── gradle.properties      <- projectxApiVersion=1.10.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -272,7 +272,7 @@ public Wait onLoop() {
 | `pauseOthersFor` | `Wait.pauseOthersFor` |
 | `webWalk`, `useLodestone`, `teleportWithGroupSystem` | `Wait.webWalk`, `Wait.useLodestone`, `Wait.teleportWithGroupSystem` |
 | `randomizedWorldHop`, `randomizedWorldHopQuick`, `checkWorldPop` | `Wait.randomizedWorldHop`, `Wait.randomizedWorldHopQuick`, `Wait.checkWorldPop` |
-| `clickKey`, `findAndPickupItems`, `checkPorter` | `Wait.clickKey`, `Wait.findAndPickupItems`, `Wait.checkPorter` |
+| `clickKey`, `findAndPickupItems`, `checkPorter`, `captureSerenSpirit` | `Wait.clickKey`, `Wait.findAndPickupItems`, `Wait.checkPorter`, `Wait.captureSerenSpirit` |
 | `togglePrayer`, `toggleQuickPrayers` | `Wait.togglePrayer`, `Wait.toggleQuickPrayers` |
 | `castAndWaitForCd`, `castWithAdren`, `castIf`, `smartCast`, `castWithEffectStacks` | `Wait.` + the same names |
 | `makeX`, `makeXSelect`, `makeXConfirm`, `selectMakeCategory`, `makeXReaction` | `Wait.` + the same names |
@@ -351,6 +351,34 @@ Use these instead of writing your own:
 
 If a script of yours needs a general helper that is not here, ask for it in
 the API rather than keeping a private copy.
+
+### Seren spirits
+
+A Seren spirit appears at random while you skill in a Grace of the elves, and
+capturing it sends a reward to your bank. Skilling scripts should take them:
+call `captureSerenSpirit()` at the top of the loop, and let long waits end
+early when one turns up.
+
+```kotlin
+override suspend fun loop() {
+    if (captureSerenSpirit()) return
+    // ...
+    delayUntil(60_000) { !localPlayer.isAnimating || findSerenSpirit() != null }
+}
+```
+
+```java
+@Override
+public Wait onLoop() {
+    if (SerenSpiritsKt.findSerenSpirit() != null) return Wait.captureSerenSpirit();
+    // ...
+}
+```
+
+`captureSerenSpirit` returns true when it caught one. A spirit that is still
+there after a capture, usually someone else's, is skipped for a minute.
+`findSerenSpirit(range)` finds the nearest one; both look 15 tiles out by
+default.
 
 ### Walking anywhere: the web walker
 
@@ -666,6 +694,38 @@ public void render() {
 | Layout | `group`, `child`, `collapsingHeader`, `treeNode`, `table`, `properties` with `row` and `valueRow`, `tabBar` with `tabItem`, `listBox`, `styleColor`, `itemWidth` |
 | Window setup | `setNextWindowPos` and `setNextWindowSize`, with the flags as ints: `WINDOW_NO_RESIZE`, `WINDOW_ALWAYS_AUTO_RESIZE`, `COND_FIRST_USE_EVER` and the rest |
 | State | `persistentState`, `boolState`, `intState`, `floatState`, `stringState`, for values that last between frames |
+
+### Experience per hour
+
+For a skilling script, `SkillTracker` does the tracking and draws a finished
+window: runtime, level and levels gained, XP gained and per hour, time to the
+next level, a progress bar, and any counts you report.
+
+```kotlin
+private val tracker = SkillTracker(Skill.WOODCUTTING)
+
+override suspend fun loop() {
+    // ...
+    if (logCut) tracker.add("Logs")
+}
+
+override fun render() = tracker.window("My Woodcutter")
+```
+
+```java
+private final SkillTracker tracker = new SkillTracker(Skill.WOODCUTTING);
+
+@Override
+public void render() {
+    tracker.window("My Woodcutter");
+}
+```
+
+Give it no skills to show every skill that gains experience. It starts
+measuring the first time it is drawn while you are logged in; `reset()` starts
+again. To put it inside a window of your own, call `tracker.draw(scope)`. The
+numbers are there too: `xpGained`, `xpPerHour`, `levelsGained`,
+`millisToLevel`, `countOf`, `countPerHour` and `runtimeMillis`.
 
 ## 7. Run it
 
