@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.11.0
+├── gradle.properties      <- projectxApiVersion=1.12.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -159,7 +159,7 @@ accident.
 | `Wait.xpDrop()` | Until the next experience drop |
 | `Wait.event(predicate, timeoutMs)` | Until an event the predicate accepts arrives |
 | `Wait.chatContaining(type, text)` | Until a chat message of that type containing the text |
-| `Wait.webWalk(x, y, plane)` | Walks there from anywhere on the world map, opening doors and using unlocked lodestones on the way; see [Walking anywhere](#walking-anywhere-the-web-walker) |
+| `Wait.webWalk(x, y, plane)` | Walks there from anywhere on the world map, taking stairs, ladders and shortcuts, opening doors and using unlocked lodestones on the way; see [Walking anywhere](#walking-anywhere-the-web-walker) |
 | `Wait.ticks(ticks, minJitter, maxJitter)` | Game ticks plus a jitter picked between `minJitter` and `maxJitter` ms |
 | `Wait.sequence(step, step, ...)` | Runs steps in order, each performing its own wait |
 | `Wait.loop(step)` | Runs a step again and again, performing its wait each time, until it returns `null` |
@@ -388,6 +388,13 @@ data and walks it: it clicks ahead along the route, opens closed doors on the
 way, and plans again if you drift off or stop moving. Planning runs off the
 game thread, so a long route never freezes the client.
 
+Routes are not limited to one floor. Alongside walking, the search can take a
+**link**: a staircase, a ladder, an agility shortcut, a cave entrance or a
+curated door. Links are the only edges that change plane, so a destination
+upstairs or underground is reachable, and the walker performs each one for you
+when it reaches it - walking up to the object, clicking it, and waiting to
+arrive on the other side.
+
 On a long walk it also considers the lodestones you have unlocked: it compares
 walking the whole way with teleporting to one of the three unlocked lodestones
 nearest the destination and walking from there (a teleport counts as about 30
@@ -409,6 +416,9 @@ Kotlin calls it directly and gets the result back:
 ```kotlin
 val result = webWalk(Tile.of(3185, 3436, 0), arriveDistance = 2)
 if (result.status != WebWalkStatus.ARRIVED) println("Could not walk to the bank: $result")
+
+// Or from coordinates, without building a Tile:
+webWalkTo(3185, 3436, plane = 0)
 ```
 
 In a state machine, add it as a traversal node:
@@ -432,21 +442,54 @@ used one.
 | Status | Meaning |
 |---|---|
 | `ARRIVED` | Within the arrive distance of the destination |
-| `NO_PATH` | No walkable route: walled off, or it needs stairs, a ladder, a shortcut or a teleport |
+| `NO_PATH` | No route: walled off, or it needs a teleport the walker does not know |
 | `TOO_FAR` | The search gave up before reaching it |
-| `OTHER_FLOOR` | The destination is on a different plane from the player |
 | `NOT_IN_WORLD` | The player or the destination is inside an instance |
 | `STUCK` | The player stopped making progress, even after planning again |
 | `STOPPED` | The script stopped while walking |
+| `OTHER_FLOOR` | No longer produced: routes cross floors. Kept so older scripts still compile |
 
-To look at a route without walking it, use `WebWalker.findPathAsync(startX,
-startY, destX, destY, plane)`, which completes with a result whose `getPath()`
-holds every tile (`getX(i)`, `getY(i)`, `crossesDoor(i)`). Kotlin scripts can
-suspend on `WebWalker.findPath(this, from, to)` instead. Never call the blocking
+#### Looking at a route without walking it
+
+```kotlin
+val result = findWebPath(Tile.of(3185, 3436, 0))   // suspends; plans off the game thread
+if (canWebWalkTo(Tile.of(3185, 3436, 0))) { /* it is reachable */ }
+```
+
+A `WebPath` is the route tile by tile. Because a route can change floor, the
+plane is per step:
+
+| Call | What it gives you |
+|---|---|
+| `size`, `lastIndex` | How many steps |
+| `getX(i)`, `getY(i)`, `getPlane(i)` | The tile of step `i` |
+| `tile(i)`, `tiles` | The same as a `Tile` |
+| `crossesDoor(i)` | Step `i` passes a door found in the cache |
+| `linkAt(i)` | The `WebLink` taken to reach step `i`, or null when it was walked |
+| `nextDoor(from)`, `nextLink(from)` | The next of each at or after `from`, or -1 |
+| `changesPlane`, `linkCount`, `doorCount` | What the route needed |
+
+Java scripts use `WebWalker.findPathAsync(startX, startY, destX, destY, plane)`,
+which completes with the same result. Never call the blocking
 `WebWalker.findPath(...)` from a script body: scripts run on the game thread.
 
-Apart from lodestones, routes stay on one plane and do not use stairs, ladders,
-shortcuts or other teleports.
+#### Links, and when one is left out
+
+A `WebLink` says where it starts (`from`), where it comes out (`to`), the object
+to click (`objectId`) and the option to use (`action`); both endpoints are
+`WebArea` rectangles, because a staircase drops you anywhere in the room at the
+top. `WebLinks.all` is the whole set and `WebLinks.from(x, y, plane)` is what can
+be taken from one tile.
+
+Some links are gated - an agility level, a quest varbit, coins for a fare. Those
+conditions read live game state, so they are evaluated once on the game thread
+before the search starts (`WebLinkPermissions.snapshot()`), and a link the
+account cannot use is left out of the route. A condition the engine does not
+recognise counts as met, so an unknown gate costs a re-plan rather than making a
+place unreachable.
+
+The link set is curated, so a route that needs something not in it reports
+`NO_PATH`. Teleports other than lodestones are not part of a route yet.
 
 `Lodestone.X.isUnlocked()` tells you whether a lodestone is unlocked, and
 `useLodestone(Lodestone.X)` teleports to one yourself. `openLodestoneMap()`
