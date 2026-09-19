@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.12.0
+├── gradle.properties      <- projectxApiVersion=1.13.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -490,6 +490,21 @@ place unreachable.
 
 The link set is curated, so a route that needs something not in it reports
 `NO_PATH`. Teleports other than lodestones are not part of a route yet.
+
+If your script finds its own way somewhere the set does not cover, hand it to
+the walker and later routes are planned straight through it:
+
+```kotlin
+// Standing at `from`, clicking object 130300's "Climb-up" put us at `to`.
+WebLinks.registerObjectLink(
+    from.x, from.y, from.plane,
+    to.x, to.y, to.plane,
+    objectId = 130300, action = "Climb-up", costTiles = 3,
+)
+```
+
+Registering the same way through twice is a no-op, and registered links last
+until the client restarts.
 
 `Lodestone.X.isUnlocked()` tells you whether a lodestone is unlocked, and
 `useLodestone(Lodestone.X)` teleports to one yourself. `openLodestoneMap()`
