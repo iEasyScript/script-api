@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.14.0
+├── gradle.properties      <- projectxApiVersion=1.15.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -505,6 +505,24 @@ WebLinks.registerObjectLink(
 
 Registering the same way through twice is a no-op, and registered links last
 until the client restarts.
+
+Some ways through ask where to go rather than simply moving you - Kharid-et's
+fort entrance opens a "Choose destination." list, and the player stays outside
+until it is answered. A link carries its answer:
+
+```kotlin
+WebLinks.register(
+    WebLink(
+        kind = WebLinkKind.OBJECT,
+        from = WebArea(3372, 3376, 3179, 3183, 0),
+        to = WebArea(2445, 2449, 7615, 7619, 0),
+        cost = 3000, action = "Enter", objectId = 116920,
+        searchRadius = 16, requirements = emptyList(),
+    ).choosing("Main fortress"),
+)
+```
+
+The walker waits for the dialog and picks the option whose text contains it.
 
 `Lodestone.X.isUnlocked()` tells you whether a lodestone is unlocked, and
 `useLodestone(Lodestone.X)` teleports to one yourself. `openLodestoneMap()`
