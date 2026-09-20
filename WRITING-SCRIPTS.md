@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.13.0
+├── gradle.properties      <- projectxApiVersion=1.14.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -512,6 +512,32 @@ opens the lodestone network from the minimap (either minimap layout) and
 `isLodestoneUiOpen` tells you when it is open. Lunar Isle, Bandit Camp
 and the City of Um report locked, because no unlock var is known for them; the
 walker never picks them.
+
+### Time sprites
+
+A time sprite is Archaeology's rockertunity: one settles on an excavation
+hotspot for a while, and digging the patch it chose is worth considerably more
+than carrying on where you are. Unlike a Seren spirit there is nothing to click
+- it only says where to dig.
+
+| Kotlin | Java | What it gives you |
+|---|---|---|
+| `findTimeSprite(range)` | same | The nearest sprite, or null |
+| `timeSpriteTile(range)` | same | The tile it settled on, or null |
+| `timeSpriteElsewhere(tile)` | `timeSpriteElsewhereThan(x, y, plane)` | A sprite is up somewhere other than the patch being dug |
+
+Aim the next dig at the sprite, and end a long one early when a sprite appears
+elsewhere - the same shape as `findSerenSpirit()`:
+
+```kotlin
+val sprite = timeSpriteTile()
+val target = sprite?.let { closestHotspotTo(it) } ?: closestHotspot()
+target?.interact("Excavate")
+
+delayUntil(180_000) {
+    inventory.isFull || findSerenSpirit() != null || timeSpriteElsewhere(target.tile)
+}
+```
 
 ### Typing
 
