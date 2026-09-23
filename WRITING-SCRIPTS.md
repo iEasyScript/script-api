@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.15.0
+├── gradle.properties      <- projectxApiVersion=1.16.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -796,6 +796,90 @@ public void render() {
 | Layout | `group`, `child`, `collapsingHeader`, `treeNode`, `table`, `properties` with `row` and `valueRow`, `tabBar` with `tabItem`, `listBox`, `styleColor`, `itemWidth` |
 | Window setup | `setNextWindowPos` and `setNextWindowSize`, with the flags as ints: `WINDOW_NO_RESIZE`, `WINDOW_ALWAYS_AUTO_RESIZE`, `COND_FIRST_USE_EVER` and the rest |
 | State | `persistentState`, `boolState`, `intState`, `floatState`, `stringState`, for values that last between frames |
+
+### Panels drawn with Compose (Kotlin)
+
+The overlay itself is drawn with [Compose](https://www.jetbrains.com/compose-multiplatform/),
+and a Kotlin script can draw its panel the same way. The engine shows it as a card
+beside the other script windows, in the overlay's look. Implement `ComposePanel`
+and write `Panel()` as an ordinary composable:
+
+```kotlin
+class MyFisher : Script(), ComposePanel {
+    private var status by mutableStateOf("Starting")
+    private var spot by mutableStateOf("Net")
+    private val freeSlots by live(28) { inventory.freeSlots }
+
+    override suspend fun loop() {
+        status = "Fishing"
+        if (interactClosestNPC("Fishing spot", spot)) waitForXPDrop(Skill.FISHING)
+    }
+
+    @Composable
+    override fun Panel() {
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Stat("Status", status, color = Palette.running)
+            Stat("Free slots", freeSlots.toString())
+        }
+        Dropdown(spot, listOf("Net", "Bait", "Lure"), { spot = it })
+        ActionButton("Stop", { stop() })
+    }
+}
+```
+
+**`Panel()` must never read the game.** It runs on the render thread while the
+game thread is changing the game's memory, so a read there can see a half-written
+value or crash the client. Give the panel state it can simply display:
+
+- `mutableStateOf` properties that `loop()` writes. The panel redraws when they change.
+- `live(initial) { ... }`, which runs its block on the game thread, every 250 ms
+  unless you pass `everyMillis`, and holds the result as state. Use it for values
+  the panel shows but `loop()` does not otherwise track, like free slots or hitpoints.
+
+Button handlers and other callbacks also run on the render thread. Setting state
+from them is fine, as the `Dropdown` above does. For anything that acts on the
+game, set a flag and let `loop()` act on it.
+
+`panelTitle` overrides the card's title, which is the script's name otherwise. A
+panel that throws is taken down and logged, and the other cards keep drawing.
+
+The overlay's own components are there to use, so a panel matches the rest of the
+UI:
+
+| Package | What it has |
+|---|---|
+| `com.projectx.ui.compose.components` | `Stat`, `ProgressBar`, `ActionButton` (with `ButtonTone`), `IconButton`, `Pill`, `Toggle`, `ToggleChip`, `Dropdown`, `Segmented`, `PillTabs`, `IntSlider`, `NumberInput`, `TextInput`, `TextArea`, `ColorField`, `MenuButton`, `Card`, `Section`, `SettingRow`, `Hint`, `Readout`, `DataTable` with `TableColumn`, `EmptyState`, `Divider` |
+| `com.projectx.ui.compose.theme` | `Palette` for the overlay's colours, and `LocalType` for its text styles |
+
+Plain Compose (`Row`, `Column`, `BasicText`, `Canvas` and the rest) works too.
+Text fields take an `OverlayText` (in `com.projectx.ui.compose`). Keep it in a
+property, such as `private val note = OverlayText.of(setting(""))`, rather than making
+one inside `Panel()`. A new one each frame would lose the keyboard focus.
+
+The build needs the Compose compiler plugin and Compose itself. Compose is
+`compileOnly` for the same reason as the API, since the engine already ships it.
+Keep the versions below matched to the engine; release notes say when they change.
+
+```kotlin
+plugins {
+    kotlin("jvm") version "2.4.0"
+    kotlin("plugin.compose") version "2.4.0"
+}
+
+repositories {
+    mavenCentral()
+    google()
+    // ... the script-api repository as above
+}
+
+dependencies {
+    compileOnly("org.jetbrains.compose.desktop:desktop:1.12.1")
+}
+```
+
+Java scripts, and Kotlin scripts that prefer it, keep using `render()` with
+`ImGuiDsl` or `Overlay` as above. Those windows are drawn as Compose cards too, so
+they get the same look without changing anything.
 
 ### Experience per hour
 

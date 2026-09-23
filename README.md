@@ -12,7 +12,7 @@ Each release carries two jars:
 
 | Jar | What it is |
 |---|---|
-| `projectx-engine-api` | The script API: script types, the action and event API, game entities, the overlay DSL |
+| `projectx-engine-api` | The script API: script types, the action and event API, game entities, the overlay DSL and Compose panels |
 | `projectx-core` | Shared types scripts use, including tiles, coordinates and the cache library |
 
 They are attached to each [release](https://github.com/iEasyScript/script-api/releases).
@@ -37,8 +37,8 @@ repositories {
 }
 
 dependencies {
-    compileOnly("com.projectx:projectx-engine-api:1.15.0")
-    compileOnly("com.projectx:projectx-core:1.15.0")
+    compileOnly("com.projectx:projectx-engine-api:1.16.0")
+    compileOnly("com.projectx:projectx-core:1.16.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 }
 ```
