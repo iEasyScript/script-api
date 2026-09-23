@@ -71,3 +71,19 @@ and what to know before you charge for it.
 
 The API tracks the engine build. A script compiled against one release is not
 guaranteed to load against a different one, so rebuild when the engine updates.
+
+## Licence
+
+The binaries released from this repository are built from the Project X engine, which derives from
+[project-undercut/engine](https://gitlab.com/project-undercut/engine) and is licensed under the
+**GNU General Public License, version 3**. The full text is in [`LICENSE`](LICENSE).
+
+**Corresponding Source** for every binary released here:
+
+| Part | Source |
+|---|---|
+| engine jar, supervisor, native bootstrap, launcher | <https://github.com/iEasyScript/engine> |
+| the `re-resources` data the engine builds against | <https://github.com/iEasyScript/reclass-data> |
+
+Both are public and free to obtain from the same place as the downloads, which is how GPLv3 §6(d) asks
+for it. Release tags match the engine's, so the source for any given build is the source at that tag.
