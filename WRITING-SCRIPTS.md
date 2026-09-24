@@ -47,16 +47,18 @@ plugins {
 }
 
 repositories {
-    mavenCentral()
-    exclusiveContent {
-        forRepository {
-            ivy {
-                url = uri("https://github.com/iEasyScript/script-api/releases/download")
-                patternLayout { artifact("v[revision]/[artifact]-[revision].[ext]") }
-                metadataSources { artifact() }
-            }
+    mavenCentral { content { excludeGroup("com.projectx") } }
+    ivy {
+        url = uri("https://github.com/iEasyScript/script-api/releases/download")
+        patternLayout {
+            ivy("v[revision]/ivy-[module]-[revision].xml")
+            artifact("v[revision]/[artifact]-[revision](-[classifier]).[ext]")
         }
-        filter { includeGroup("com.projectx") }
+        metadataSources {
+            ivyDescriptor()
+            artifact()
+        }
+        content { includeGroup("com.projectx") }
     }
 }
 
@@ -70,6 +72,9 @@ dependencies {
 
 `compileOnly` matters. The engine already has these classes loaded, so bundling
 them into your jar would shadow the running engine and break in confusing ways.
+
+The `ivy(...)` line pulls in the API's sources as well as its jars, so ctrl+click
+on any API call opens the Kotlin behind it rather than decompiled bytecode.
 
 ## 2. Write a script
 

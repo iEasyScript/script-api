@@ -23,16 +23,18 @@ fetches them like any other dependency.
 
 ```kotlin
 repositories {
-    mavenCentral()
-    exclusiveContent {
-        forRepository {
-            ivy {
-                url = uri("https://github.com/iEasyScript/script-api/releases/download")
-                patternLayout { artifact("v[revision]/[artifact]-[revision].[ext]") }
-                metadataSources { artifact() }
-            }
+    mavenCentral { content { excludeGroup("com.projectx") } }
+    ivy {
+        url = uri("https://github.com/iEasyScript/script-api/releases/download")
+        patternLayout {
+            ivy("v[revision]/ivy-[module]-[revision].xml")
+            artifact("v[revision]/[artifact]-[revision](-[classifier]).[ext]")
         }
-        filter { includeGroup("com.projectx") }
+        metadataSources {
+            ivyDescriptor()
+            artifact()
+        }
+        content { includeGroup("com.projectx") }
     }
 }
 
@@ -45,6 +47,12 @@ dependencies {
 
 `compileOnly` is deliberate. The engine already has these classes loaded, so
 bundling them into your script jar would shadow the running engine.
+
+The `ivy(...)` line is what gets you the API's source. Every release ships a
+`-sources` jar beside each jar, and that descriptor is how Gradle finds it:
+ctrl+click a call in your script and the IDE opens the API's own Kotlin,
+comments and all, instead of decompiled bytecode. On an existing project,
+reload Gradle once after switching - the old resolution is cached.
 
 Build with JDK 25 and Kotlin 2.4.0 to match the engine, and edit in IntelliJ IDEA 2026.1 or newer: older IDEs cannot read Kotlin 2.4 classes and show every API import as unresolved. Java scripts extend
 `JavaScript` rather than `Script`; the guide explains why.
