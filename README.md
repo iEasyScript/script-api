@@ -39,8 +39,8 @@ repositories {
 }
 
 dependencies {
-    compileOnly("com.projectx:projectx-engine-api:1.17.0")
-    compileOnly("com.projectx:projectx-core:1.17.0")
+    compileOnly("com.projectx:projectx-engine-api:1.18.0")
+    compileOnly("com.projectx:projectx-core:1.18.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 }
 ```

@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.17.0
+├── gradle.properties      <- projectxApiVersion=1.18.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -741,6 +741,12 @@ when enabled and still needed, and waits on its own outcome.
 val trip = WarsRetreatTrip(portalName = "Portal (Raksha)", summonConjures = true, bankPin = settings.bankPin)
 if (runWarsRetreatTrip(trip)) { /* through the portal */ }
 ```
+
+Set `trip.advancedMovement = true` to move the way players do: a Dive from the
+teleport arrival to the bank, then Surge and Dive north to the crystal or boss
+portal. `trip.advancedMovementChance` (0-100) sets how often each shortcut is
+taken. Surge and Dive (or Bladed Dive) must be on an action bar; when either is
+cooling down, the trip walks.
 
 **Bank PIN.** `enterBankPin(pin)` enters a four-digit PIN on the PIN screen,
 waiting for each digit to register; it returns straight away when the screen is
