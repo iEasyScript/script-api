@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.16.0
+├── gradle.properties      <- projectxApiVersion=1.17.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -633,6 +633,118 @@ block the game. In Java, return `Wait.awaitGrandExchangePrices()` or poll
 
 The exchange state is read on the Windows client; on other platforms
 `GrandExchange.isSupported` is false and every slot reads as empty.
+
+### Combat and bossing
+
+Everything a boss script needs is in the API, so no script has to carry its own
+copy. It is all Kotlin- and Java-friendly: the managers are plain classes you
+call from your loop, and every helper that waits has a `Wait` of the same name.
+
+**The server tick.** Combat, cooldowns and prayers resolve on the server's
+600 ms tick. `delayTicks` is a local timer that drifts away from it within a few
+ticks, so anything that must land on a tick boundary counts real ticks instead:
+
+| Kotlin | Java | What it gives you |
+|---|---|---|
+| `ServerTick.count` | `ServerTick.getCount()` | Server ticks seen so far |
+| `ServerTick.millisSinceTick` | `ServerTick.getMillisSinceTick()` | Time since the last tick ended |
+| `awaitServerTick()` / `awaitServerTicks(n)` | `Wait.awaitServerTick()` / `Wait.awaitServerTicks(n)` | Wait for the next tick(s) |
+
+**Abilities, prayers and buffs by name.** `Ability` and `Effect` name the common
+ones; these reach everything else by the name the game shows (case and the
+game's non-breaking spaces do not matter):
+
+| Call | What it gives you |
+|---|---|
+| `castAbility("Greater Flurry")` | Clicks it on the action bar; false when it is not on a bar |
+| `abilityUsable(name)` | On a bar, its own cooldown within a tick of ending, and enough adrenaline |
+| `abilityReady(name)` / `isOnActionBar(name)` | Off cooldown / on a bar |
+| `abilityNamed(name)` / `actionBarAbility(name)` | The ability itself: name, adrenaline cost, cooldowns |
+| `effectNamed("Necrosis")` | Any buff or debuff: `active()`, `stacks()`, `timeRemainingMs()`, `activeOnOpponent()` |
+| `equipFromInventory(name)` | Wields, wears or equips an inventory item |
+
+Prayers and curses on the action bar are cast the same way:
+`castAbility("Soul Split")`.
+
+**Rotations.** Build a rotation as a list of steps and let a `RotationManager`
+walk it. `execute()` never blocks: call it every loop alongside everything else
+you watch, and it fires the next step only once the previous step's wait has
+passed. Mechanics, food and movement can interrupt it on any tick and it
+resumes where it left off. Ability steps never click an ability that is not
+ready, so a missing or cooling ability costs a step, not a stall.
+
+```kotlin
+val opener = listOf(
+    RotationStep.ability("Bloat").waitTicks(3),
+    RotationStep.ability("Death Skulls").waitTicks(4),
+    RotationStep.ability("Finger of Death")
+        .onlyIf { Effect.NECROSIS.stacks >= 6 }
+        .otherwise("Touch of Death"),
+    RotationStep.inventory("Adrenaline renewal").waitTicks(1),
+    RotationStep.custom("Target boss") { findClosestNPC("Raksha")?.interact("Attack") == true },
+    RotationStep.improvise(CombatStyle.NECROMANCY, spend = true),
+)
+val rotation = RotationManager()
+
+override suspend fun loop() {
+    rotation.load(opener)          // loading the rotation already running changes nothing
+    rotation.execute()
+}
+```
+
+A step waits 3 server ticks unless given `waitTicks` or `waitMillis`. `onlyIf`
+guards a step: when it fails, `otherwise(...)` runs instead, or the step is
+skipped without waiting. `improvise` casts the style's filler (Necromancy:
+executes, stack spenders, conjure commands, builders) and repeats until you load
+another rotation. `recentSteps` lists what fired, for an overlay.
+
+**Prayer flicking.** `PrayerFlicker` keeps the right protection prayer up: a
+default prayer while nothing threatens, and the highest-priority live threat's
+prayer otherwise. Call `update()` every loop; `missingPrayers` names any prayer
+it needs that is not on an action bar.
+
+```kotlin
+val flicker = PrayerFlicker(
+    Prayer.SOUL_SPLIT,
+    listOf(
+        PrayerThreat.projectile("Magic orb", Prayer.DEFLECT_MAGIC, projectileId = 1234).priority(2),
+        PrayerThreat.animation("Slam", Prayer.DEFLECT_MELEE, npcId = 5678, range = 20, 9012).delayTicks(1),
+        PrayerThreat.condition("Enrage", Prayer.DEFLECT_RANGE) { bossHealthPercent < 25 }.durationTicks(3),
+    ),
+)
+```
+
+**Supplies.** `CombatSupplies` eats, drinks and keeps buffs up at thresholds you
+set: food, blubber jellyfish, brews, Enhanced Excalibur, prayer restores, the
+ancient elven ritual shard, and a War's Retreat teleport when there is nothing
+left. `keepUp(listOf(BuffRequest(...)))` keeps buffs up and switches toggle buffs
+off once you stop requesting them. Call `update()` every loop.
+
+```kotlin
+val supplies = CombatSupplies(
+    food = Threshold.percent(60),
+    jellyfish = Threshold.percent(70),
+    prayerPotion = Threshold.fixed(300),
+)
+supplies.keepUp(listOf(
+    BuffRequest("Overload", Effect.OVERLOADED.type, { drinkOverload() }, refreshAtMillis = 15_000),
+))
+```
+
+**War's Retreat.** One call runs the whole trip between kills: it teleports
+there if needed, loads the last preset (entering your bank PIN if the bank asks
+for it), restores prayer at the altar, fills adrenaline at the crystal, summons
+conjures, prebuilds on a dummy, and enters the boss portal. Each stop runs only
+when enabled and still needed, and waits on its own outcome.
+
+```kotlin
+val trip = WarsRetreatTrip(portalName = "Portal (Raksha)", summonConjures = true, bankPin = settings.bankPin)
+if (runWarsRetreatTrip(trip)) { /* through the portal */ }
+```
+
+**Bank PIN.** `enterBankPin(pin)` enters a four-digit PIN on the PIN screen,
+waiting for each digit to register; it returns straight away when the screen is
+not open. `BankPin.isOpen` and `BankPin.digitsEntered` report the screen.
 
 ## 3. The one habit that matters
 
