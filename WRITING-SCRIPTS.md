@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.18.0
+├── gradle.properties      <- projectxApiVersion=1.19.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -659,6 +659,8 @@ game's non-breaking spaces do not matter):
 | `castAbility("Greater Flurry")` | Clicks it on the action bar; false when it is not on a bar |
 | `abilityUsable(name)` | On a bar, its own cooldown within a tick of ending, and enough adrenaline |
 | `abilityReady(name)` / `isOnActionBar(name)` | Off cooldown / on a bar |
+| `abilityOnCooldown(name)` | Its own cooldown is running (the global cooldown does not count) |
+| `abilityCooldownTicks(name, ignoreGCD)` / `abilityCooldownMillis(name, ignoreGCD)` | Time until it can be used again; 0 when ready |
 | `abilityNamed(name)` / `actionBarAbility(name)` | The ability itself: name, adrenaline cost, cooldowns |
 | `effectNamed("Necrosis")` | Any buff or debuff: `active()`, `stacks()`, `timeRemainingMs()`, `activeOnOpponent()` |
 | `equipFromInventory(name)` | Wields, wears or equips an inventory item |
@@ -869,6 +871,10 @@ Available types are `BooleanConfigItem`, `IntConfigItem`, `StringConfigItem`,
 `OptionsConfigItem`, `EnumConfigItem`, `InfoDisplayConfigItem` and
 `ConfigSection`. Read a value with `.value`, or `getValue()` from Java. The
 trailing constructor arguments are optional in both languages.
+
+Settings are saved as the user changes them and restored on the next run, even
+after the client restarts. They are stored by field name, so renaming a field
+or changing its type puts that one setting back to your default.
 
 ## 6. Show an overlay
 
