@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.21.0
+├── gradle.properties      <- projectxApiVersion=1.21.1
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -238,8 +238,13 @@ script's name. A message identical to the one before it is dropped, so a line in
 a loop reports a change instead of a wall of the same text:
 
 ```kotlin
+import com.projectx.script.api.log
+
 log("Banking at ${bank.name}")
 ```
+
+If your script already has a `log` of its own, it keeps winning — yours is a
+member, this is an extension — so nothing you have written has to change.
 
 ### Reacting to danger mid-wait: shouldInterrupt
 
