@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.19.0
+├── gradle.properties      <- projectxApiVersion=1.20.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -651,8 +651,9 @@ ticks, so anything that must land on a tick boundary counts real ticks instead:
 | `awaitServerTick()` / `awaitServerTicks(n)` | `Wait.awaitServerTick()` / `Wait.awaitServerTicks(n)` | Wait for the next tick(s) |
 
 **Abilities, prayers and buffs by name.** `Ability` and `Effect` name the common
-ones; these reach everything else by the name the game shows (case and the
-game's non-breaking spaces do not matter):
+ones; these reach everything else by the name the game shows (case, the game's
+non-breaking spaces and the underscores struct names use do not matter, so
+"Scrimshaw Active" finds SCRIMSHAW_ACTIVE):
 
 | Call | What it gives you |
 |---|---|
@@ -662,7 +663,10 @@ game's non-breaking spaces do not matter):
 | `abilityOnCooldown(name)` | Its own cooldown is running (the global cooldown does not count) |
 | `abilityCooldownTicks(name, ignoreGCD)` / `abilityCooldownMillis(name, ignoreGCD)` | Time until it can be used again; 0 when ready |
 | `abilityNamed(name)` / `actionBarAbility(name)` | The ability itself: name, adrenaline cost, cooldowns |
-| `effectNamed("Necrosis")` | Any buff or debuff: `active()`, `stacks()`, `timeRemainingMs()`, `activeOnOpponent()` |
+| `effectActive("Necrosis")` / `effectActive(id)` | Whether a buff or debuff is on the bar right now |
+| `effectStacks(name)` / `effectTimeRemainingMs(name)` | Its stacks, and the time left on it; 0 when it is not up |
+| `effectNamed("Necrosis")` / `effectWithId(id)` | The buff or debuff itself: `active()`, `stacks()`, `timeRemainingMs()`, `activeOnOpponent()` |
+| `activeEffects()` | Every buff and debuff on the bar right now |
 | `equipFromInventory(name)` | Wields, wears or equips an inventory item |
 
 Prayers and curses on the action bar are cast the same way:
