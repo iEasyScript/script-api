@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.20.0
+├── gradle.properties      <- projectxApiVersion=1.21.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -208,6 +208,38 @@ protected void beforeEachStep() {
 
 The engine also pauses `Script.LOOP_PASS_MILLIS` ms after every loop pass, on
 top of the wait you returned.
+
+### How often the loop runs
+
+That pause is 40 ms, which is what lets a script notice something the moment it
+happens. Change it from `onStart()` when your script does not need it:
+
+```kotlin
+override suspend fun onStart() {
+    setLoopOnServerTick()   // one pass per game tick, as the tick lands
+    // or setLoop(400)      // a fixed pause of your own
+}
+```
+
+Prefer `setLoopOnServerTick()` to `setLoop(600)`. The game resolves on a 600 ms
+server tick, but a 600 ms *pause* drifts off it, because your pass's own work is
+added to it; `setLoopOnServerTick()` starts each pass as the tick lands, so the
+pass reads what the tick just changed.
+
+A slower pace costs reaction time: whatever you watch for is noticed up to one
+pass later. Anything that has to react at once - a floor marker landing under
+you, a boss's animation - either keeps the default or uses `shouldInterrupt()`
+below, which is polled while your script waits whatever the pace.
+
+### Logging
+
+`log("...")` prints to the console and to `~/.projectx/logs/`, under your
+script's name. A message identical to the one before it is dropped, so a line in
+a loop reports a change instead of a wall of the same text:
+
+```kotlin
+log("Banking at ${bank.name}")
+```
 
 ### Reacting to danger mid-wait: shouldInterrupt
 
@@ -879,6 +911,33 @@ trailing constructor arguments are optional in both languages.
 Settings are saved as the user changes them and restored on the next run, even
 after the client restarts. They are stored by field name, so renaming a field
 or changing its type puts that one setting back to your default.
+
+### Keeping settings in their own class
+
+A script with many settings can put them in a `ConfigHolder` instead of opening
+with a wall of fields. Declare the holder as a field and the engine finds its
+items - in the panel, in what it saves and in the reset button - exactly as if
+they were the script's own:
+
+```kotlin
+class MinerSettings : ConfigHolder {
+    val ore = ConfigSection("Ore", "What to mine and what to do with it.")
+    val bankOre = BooleanConfigItem("Bank the ore", "Off drops it.", true)
+    val range = IntConfigItem("Range", "Search range in tiles.", 20)
+}
+
+class Miner : Script(), ConfigurableScript {
+    private val settings = MinerSettings()
+
+    override suspend fun loop() {
+        if (settings.bankOre.value) bank()
+    }
+}
+```
+
+A holder may hold further holders. Items inside one are stored under
+`<holder field>.<item field>`, so two holders can use the same field name, and
+settings saved before you moved your items into a holder are still read back.
 
 ## 6. Show an overlay
 
