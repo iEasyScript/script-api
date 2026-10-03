@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.21.1
+├── gradle.properties      <- projectxApiVersion=1.22.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -313,9 +313,10 @@ public Wait onLoop() {
 | `delayTicks`, `delayBetween`, `delay(mean, variance)` | `Wait.ticks`, `Wait.between`, `Wait.ms` |
 | `pauseOthersFor` | `Wait.pauseOthersFor` |
 | `webWalk`, `useLodestone`, `teleportWithGroupSystem` | `Wait.webWalk`, `Wait.useLodestone`, `Wait.teleportWithGroupSystem` |
-| `randomizedWorldHop`, `randomizedWorldHopQuick`, `checkWorldPop` | `Wait.randomizedWorldHop`, `Wait.randomizedWorldHopQuick`, `Wait.checkWorldPop` |
+| `randomizedWorldHop`, `randomizedWorldHopQuick`, `checkWorldPop`, `hopToWorld` | `Wait.randomizedWorldHop`, `Wait.randomizedWorldHopQuick`, `Wait.checkWorldPop`, `Wait.hopToWorld` |
 | `clickKey`, `findAndPickupItems`, `checkPorter`, `captureSerenSpirit` | `Wait.clickKey`, `Wait.findAndPickupItems`, `Wait.checkPorter`, `Wait.captureSerenSpirit` |
 | `togglePrayer`, `toggleQuickPrayers` | `Wait.togglePrayer`, `Wait.toggleQuickPrayers` |
+| `summonConjures` | `Wait.summonConjures` |
 | `castAndWaitForCd`, `castWithAdren`, `castIf`, `smartCast`, `castWithEffectStacks` | `Wait.` + the same names |
 | `makeX`, `makeXSelect`, `makeXConfirm`, `selectMakeCategory`, `makeXReaction` | `Wait.` + the same names |
 | `smithSetQuantity`, `smithSelectTier`, `smithSelectItem`, `smithMake` | `Wait.` + the same names |
@@ -784,6 +785,16 @@ when enabled and still needed, and waits on its own outcome.
 val trip = WarsRetreatTrip(portalName = "Portal (Raksha)", summonConjures = true, bankPin = settings.bankPin)
 if (runWarsRetreatTrip(trip)) { /* through the portal */ }
 ```
+
+A trip remembers the stops it has finished, so a pass that returns before the
+portal carries on from where it stopped instead of loading the preset again.
+`trip.completed` is that set, and `trip.reset()` clears it if you want the next
+run to start over.
+
+**Conjures.** `summonConjures()` raises the undead army and waits for all three
+to stand, returning whether they did; `conjuresUp` says whether they already
+are. Useful outside a trip too - conjures summoned in a boss lobby are fresh
+for the kill, where ones raised at War's Retreat have already been ticking.
 
 Set `trip.advancedMovement = true` to move the way players do: a Dive from the
 teleport arrival to the bank, then Surge and Dive north to the crystal or boss
