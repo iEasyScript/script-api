@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.22.0
+├── gradle.properties      <- projectxApiVersion=1.23.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -164,7 +164,7 @@ accident.
 | `Wait.xpDrop()` | Until the next experience drop |
 | `Wait.event(predicate, timeoutMs)` | Until an event the predicate accepts arrives |
 | `Wait.chatContaining(type, text)` | Until a chat message of that type containing the text |
-| `Wait.webWalk(x, y, plane)` | Walks there from anywhere on the world map, taking stairs, ladders and shortcuts, opening doors and using unlocked lodestones on the way; see [Walking anywhere](#walking-anywhere-the-web-walker) |
+| `Wait.webWalk(x, y, plane)` | Walks there from anywhere on the world map: stairs, ladders, shortcuts, doors, boats and other NPC transport, fairy rings, and teleports when they get there sooner; see [Walking anywhere](#walking-anywhere-the-web-walker) |
 | `Wait.ticks(ticks, minJitter, maxJitter)` | Game ticks plus a jitter picked between `minJitter` and `maxJitter` ms |
 | `Wait.sequence(step, step, ...)` | Runs steps in order, each performing its own wait |
 | `Wait.loop(step)` | Runs a step again and again, performing its wait each time, until it returns `null` |
@@ -431,18 +431,22 @@ data and walks it: it clicks ahead along the route, opens closed doors on the
 way, and plans again if you drift off or stop moving. Planning runs off the
 game thread, so a long route never freezes the client.
 
-Routes are not limited to one floor. Alongside walking, the search can take a
-**link**: a staircase, a ladder, an agility shortcut, a cave entrance or a
-curated door. Links are the only edges that change plane, so a destination
-upstairs or underground is reachable, and the walker performs each one for you
-when it reaches it - walking up to the object, clicking it, and waiting to
-arrive on the other side.
+Routes are not limited to one floor or one island. Alongside walking, the search
+can take a **link**: a staircase, a ladder, an agility shortcut, a cave entrance,
+a door, a boat or other NPC transport (ferrymen, charter crews, carpets), an item
+used on an object, or a fairy ring. The walker performs each one for you when it
+reaches it - walking up to it, using it, answering whatever it asks, and waiting
+to arrive on the other side.
 
-On a long walk it also considers the lodestones you have unlocked: it compares
-walking the whole way with teleporting to one of the three unlocked lodestones
-nearest the destination and walking from there (a teleport counts as about 30
-tiles of walking), and teleports when that is quicker. If the lodestone map does
-not open or the teleport does not arrive, it walks instead.
+A route may also **begin with a teleport** when that gets there sooner: any
+lodestone you have unlocked, a teleport item you are carrying (in the backpack,
+or worn), a spell, or the Passage of the Abyss. The search weighs each teleport's
+time against walking, so short walks never teleport. While walking it Dives and
+Surges along straight stretches of the route when those abilities are ready.
+
+The link set and its routing come from Query's
+[navpathService](https://github.com/ShaggyHW/navpathService), used with his
+permission.
 
 Java returns it as a wait. Pass a callback to find out how it ended:
 
@@ -474,13 +478,24 @@ Traversal.traversal(next = Banking(), finishedCondition = { bank.isOpen }) {
 ```
 
 The arrive distance is how close counts as there, in tiles with diagonals
-counting as one; it defaults to 2. To walk without lodestones, pass
+counting as one; it defaults to 2. To walk without any teleport, pass
 `useLodestones = false` in Kotlin, or `false` after the callback in Java:
 `Wait.webWalk(x, y, plane, 2, null, false)`.
 
+Two switches on `WebWalker` cover what a script may want to keep for itself:
+
+| Setting | Default | Turn it off when |
+|---|---|---|
+| `WebWalker.useItemTeleports` | `true` | Your script carries teleport items or the Passage of the Abyss for its own use, so the walker never spends a charge or a tab |
+| `WebWalker.useMovementAbilities` | `true` | Your script saves Dive or Surge for something else, such as a boss mechanic |
+
+Java sets them with `WebWalker.INSTANCE.setUseItemTeleports(false)`.
+
 Every walk ends with a `WebWalkResult`: its `status` says what happened,
 `message` says why, and `lodestone` names the lodestone it teleported to, if it
-used one.
+used one. A link that fails while walking - a quest the engine could not check,
+a worn item it could not reach - is set aside for the rest of that walk and the
+route is planned around it, so one bad link does not end the walk.
 
 | Status | Meaning |
 |---|---|
@@ -518,11 +533,28 @@ which completes with the same result. Never call the blocking
 
 #### Links, and when one is left out
 
-A `WebLink` says where it starts (`from`), where it comes out (`to`), the object
-to click (`objectId`) and the option to use (`action`); both endpoints are
-`WebArea` rectangles, because a staircase drops you anywhere in the room at the
-top. `WebLinks.all` is the whole set and `WebLinks.from(x, y, plane)` is what can
-be taken from one tile.
+A `WebLink` says where it starts (`from`), where it comes out (`to`), what kind
+it is (`kind`) and the option to use (`action`); both endpoints are `WebArea`
+rectangles, because a staircase drops you anywhere in the room at the top.
+`WebLinks.all` is the whole set, `WebLinks.from(x, y, plane)` is what can be
+taken from one tile, and `WebLinks.globals` is the teleports, which can be taken
+from anywhere.
+
+| `kind` | What the walker does | What the link carries |
+|---|---|---|
+| `OBJECT`, `DOOR` | Clicks the object | `objectId` |
+| `NPC` | Uses the NPC, e.g. "Travel" or "Charter" | `target`: the NPC's id, or the start of its name |
+| `USE_ON` | Uses an item from the backpack on the object | `target` (the item) and `objectId` |
+| `FAIRY_RING` | Opens the ring and dials the other ring's code | `fairyCode`, e.g. `"ckr"` |
+| `ITEM` | Uses a carried item's option, e.g. "Rub" | `target` (the item) |
+| `INTERFACE` | Clicks a button, such as a spell | the click is the first of `chain` |
+| `POA` | Uses the Passage of the Abyss, then picks the jewellery and the place | `target` and `menu` |
+| `LODESTONE` | Teleports through the lodestone map | `lodestone` |
+
+`kind.isGlobal` is true for the last four. Anything a link does after its first
+action is its `chain`, in order: `WebInterfaceStep` clicks on an interface, and
+`WebObjectStep` uses of another object - a trapdoor is picked open, then climbed
+down. `steps` is the interface clicks alone, as before.
 
 Some links are gated - an agility level, a quest varbit, coins for a fare. Those
 conditions read live game state, so they are evaluated once on the game thread
@@ -531,8 +563,8 @@ account cannot use is left out of the route. A condition the engine does not
 recognise counts as met, so an unknown gate costs a re-plan rather than making a
 place unreachable.
 
-The link set is curated, so a route that needs something not in it reports
-`NO_PATH`. Teleports other than lodestones are not part of a route yet.
+A link that uses an item is only taken while the item is carried. The link set
+is curated, so a route that needs something not in it reports `NO_PATH`.
 
 If your script finds its own way somewhere the set does not cover, hand it to
 the walker and later routes are planned straight through it:
@@ -570,9 +602,10 @@ The walker waits for the dialog and picks the option whose text contains it.
 `Lodestone.X.isUnlocked()` tells you whether a lodestone is unlocked, and
 `useLodestone(Lodestone.X)` teleports to one yourself. `openLodestoneMap()`
 opens the lodestone network from the minimap (either minimap layout) and
-`isLodestoneUiOpen` tells you when it is open. Lunar Isle, Bandit Camp
-and the City of Um report locked, because no unlock var is known for them; the
-walker never picks them.
+`isLodestoneUiOpen` tells you when it is open. `Lodestone.WENDLEWICK` is new.
+`isUnlocked()` still reports Lunar Isle, Bandit Camp and the City of Um as
+locked, but the walker no longer relies on it: it checks each lodestone's unlock
+the way navpathService does, so it uses those three too once you have them.
 
 ### Time sprites
 
