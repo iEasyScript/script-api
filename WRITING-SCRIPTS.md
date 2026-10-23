@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.23.0
+├── gradle.properties      <- projectxApiVersion=1.24.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -325,6 +325,7 @@ public Wait onLoop() {
 | `bobStore`, `bobWithdraw` (pairs) | `Wait.bobStoreById` / `bobStoreByName`, `Wait.bobWithdrawById` / `bobWithdrawByName` (a `Map` of amounts) |
 | `joinInstance`, `confirmInstanceDialogue`, `startOrRejoinInstance` | `Wait.` + the same names |
 | `typeText`, `pressKey` | `Wait.` + the same names |
+| `enterBankPin`, `openNearestBank` | `Wait.` + the same names |
 | `geOpen`, `geBuy`, `geSell`, `geAbort`, `geCollectAll`, `awaitGrandExchangePrices` | `Wait.` + the same names; `Wait.geBuyInSlot` / `geSellInSlot` to pick the slot |
 
 Kotlin lambdas become Java types in these factories: a condition is a
@@ -838,6 +839,16 @@ cooling down, the trip walks.
 **Bank PIN.** `enterBankPin(pin)` enters a four-digit PIN on the PIN screen,
 waiting for each digit to register; it returns straight away when the screen is
 not open. `BankPin.isOpen` and `BankPin.digitsEntered` report the screen.
+
+**Nearest bank.** `openNearestBank(bankPin)` opens the bank in reach, or walks
+to the nearest bank in `Banks` and opens that, typing `bankPin` if the bank asks
+(leave it null to let the player type it). It returns whether the bank opened.
+`findNearestBank()` compares walking routes to the few closest banks and returns
+the shortest as a `BankSite` (`name`, `tile`); `Banks.entries` lists them all.
+
+```kotlin
+if (openNearestBank(settings.bankPin.value.ifBlank { null })) depositBankInventory()
+```
 
 ## 3. The one habit that matters
 
