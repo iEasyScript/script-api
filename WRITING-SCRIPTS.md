@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.25.0
+├── gradle.properties      <- projectxApiVersion=1.26.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -878,6 +878,18 @@ the shortest as a `BankSite` (`name`, `tile`); `Banks.entries` lists them all.
 
 ```kotlin
 if (openNearestBank(settings.bankPin.value.ifBlank { null })) depositBankInventory()
+```
+
+It banks across a counter too, as at the Grand Exchange, where the bankers
+can't be walked up to.
+
+**Items' own bank options.** Some items add their own options to the bank's
+backpack, such as an essence pouch's "Fill" or an ore box's "Empty - ore".
+`bankInventoryOption(itemId, option)` clicks one by name while the bank is
+open, and returns false when the item isn't there or has no such option:
+
+```kotlin
+for (pouch in inventory.filter { it.name.endsWith("pouch") }) bankInventoryOption(pouch.id, "Fill")
 ```
 
 ## 3. The one habit that matters
