@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.26.0
+├── gradle.properties      <- projectxApiVersion=1.27.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -449,6 +449,25 @@ Surges along straight stretches of the route when those abilities are ready.
 The link set and its routing come from Query's
 [navpathService](https://github.com/ShaggyHW/navpathService), used with his
 permission.
+
+Routes are planned on the Project X server, which runs navpathService for every
+signed-in player: it plans Surge and Dive into the route and varies routes from
+player to player. When the server can't be reached the walker plans the route
+itself from the same links, so a script never waits on it. Set
+`WebWalker.useHostedPlanner = false` to plan locally only.
+
+While walking it reads the live map: doors that already stand open are walked
+through, shut ones are opened from a few steps away, a locked door is routed
+around, and a walk that stops moving is planned again.
+
+`walkingDistanceTo(x, y, plane)` gives the walking distance from the player to a
+tile on the live map: -1 when no walk gets there within the search range, -2
+when the map can't tell (another floor, an instance, or just after a teleport).
+It is a better measure than a straight line when there are walls between:
+
+```kotlin
+val bank = Banks.entries.minByOrNull { walkingDistanceTo(it.tile.x, it.tile.y, it.tile.plane).takeIf { d -> d >= 0 } ?: Int.MAX_VALUE }
+```
 
 Java returns it as a wait. Pass a callback to find out how it ended:
 
