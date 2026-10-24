@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.24.0
+├── gradle.properties      <- projectxApiVersion=1.25.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -326,6 +326,7 @@ public Wait onLoop() {
 | `joinInstance`, `confirmInstanceDialogue`, `startOrRejoinInstance` | `Wait.` + the same names |
 | `typeText`, `pressKey` | `Wait.` + the same names |
 | `enterBankPin`, `openNearestBank` | `Wait.` + the same names |
+| `fillOreBox` | `Wait.fillOreBox` |
 | `geOpen`, `geBuy`, `geSell`, `geAbort`, `geCollectAll`, `awaitGrandExchangePrices` | `Wait.` + the same names; `Wait.geBuyInSlot` / `geSellInSlot` to pick the slot |
 
 Kotlin lambdas become Java types in these factories: a condition is a
@@ -633,6 +634,35 @@ delayUntil(180_000) {
     inventory.isFull || findSerenSpirit() != null || timeSpriteElsewhere(target.tile)
 }
 ```
+
+### Mining
+
+Rockertunities, stamina and the ore box are shared by every rock, so the API
+carries them and a miner doesn't need its own spot-animation ids or varbits.
+
+| Kotlin | Java | What it gives you |
+|---|---|---|
+| `findRockertunity(range)` | same | The nearest rockertunity glint, or null |
+| `findRockertunityRock(range) { rock -> ... }` | same | The minable rock the glint sits on that your test accepts, or null |
+| `miningStaminaBar` | `getMiningStaminaBar()` | Stamina left on the headbar, 0-255, or -1 while no rock is being worked |
+| `hasOreBox()` | same | An ore box of any tier is in the backpack |
+| `oreBoxCount(oreId)` | same | How many of that ore the box holds |
+| `fillOreBox()` | `Wait.fillOreBox` | Fills the box and waits; false when nothing moved because it is full or doesn't take that ore |
+| `emptyOreBoxIntoBank()` | same | Empties the box into the open bank |
+
+Clicking the rock you're on refills stamina, so top it up before it runs out
+rather than every swing, and take the rockertunity whenever one glints:
+
+```kotlin
+val glint = findRockertunityRock { it.name() == "Iron rock" }
+if (glint != null) glint.interact("Mine")
+else if (miningStaminaBar in 0 until 110) currentRock.interact("Mine")
+
+if (inventory.isFull && !fillOreBox()) openNearestBank()
+```
+
+`miningStamina` still reads the stamina var, whose ceiling grows with Mining
+level; `miningStaminaBar` reads the same at any level.
 
 ### Typing
 
