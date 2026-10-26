@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.27.0
+├── gradle.properties      <- projectxApiVersion=1.28.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -856,6 +856,16 @@ val supplies = CombatSupplies(
 supplies.keepUp(listOf(
     BuffRequest("Overload", Effect.OVERLOADED.type, { drinkOverload() }, refreshAtMillis = 15_000),
 ))
+```
+
+**Eating on your own.** `eatFood()` presses the action bar's Eat Food and
+returns false, without pressing it, when the backpack has no food left;
+`foodInBackpack` counts what is there (anything with an Eat option). Check the
+return value so a script that runs dry restocks or falls back instead of eating
+nothing:
+
+```kotlin
+if (healthPercent < 40 && !eatFood()) castAbility(Ability.WARS_RETREAT_TELEPORT)
 ```
 
 **War's Retreat.** One call runs the whole trip between kills: it teleports
