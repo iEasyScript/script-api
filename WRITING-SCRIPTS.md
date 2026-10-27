@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.28.0
+├── gradle.properties      <- projectxApiVersion=1.29.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -1206,18 +1206,33 @@ they get the same look without changing anything.
 
 ### Experience per hour
 
-For a skilling script, `SkillTracker` does the tracking and draws a finished
-window: runtime, level and levels gained, XP gained and per hour, time to the
+For a skilling script, `SkillTracker` does the tracking and gives you a finished
+readout: runtime, level and levels gained, XP gained and per hour, time to the
 next level, a progress bar, and any counts you report.
 
+In a Compose panel, read it on the game thread with `live` and show the snapshot
+with `SkillTrackerReadout`:
+
 ```kotlin
-private val tracker = SkillTracker(Skill.WOODCUTTING)
+class MyWoodcutter : Script(), ComposePanel {
+    private val tracker = SkillTracker(Skill.WOODCUTTING)
+    private val progress by live(SkillTrackerSnapshot()) { tracker.snapshot() }
 
-override suspend fun loop() {
-    // ...
-    if (logCut) tracker.add("Logs")
+    override suspend fun loop() {
+        // ...
+        if (logCut) tracker.add("Logs")
+    }
+
+    @Composable
+    override fun Panel() = SkillTrackerReadout(progress)
 }
+```
 
+`tracker.snapshot()` reads the game, so it belongs in `live`, never inside
+`Panel()`. Java scripts, and Kotlin scripts still on `render()`, draw the same
+readout as a window:
+
+```kotlin
 override fun render() = tracker.window("My Woodcutter")
 ```
 
