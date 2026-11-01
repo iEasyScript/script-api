@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.29.0
+├── gradle.properties      <- projectxApiVersion=1.30.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -317,6 +317,7 @@ public Wait onLoop() {
 | `clickKey`, `findAndPickupItems`, `checkPorter`, `captureSerenSpirit` | `Wait.clickKey`, `Wait.findAndPickupItems`, `Wait.checkPorter`, `Wait.captureSerenSpirit` |
 | `togglePrayer`, `toggleQuickPrayers` | `Wait.togglePrayer`, `Wait.toggleQuickPrayers` |
 | `summonConjures` | `Wait.summonConjures` |
+| `reclaimFromDeath`, `faceTile`, `surgeToward` | `Wait.` + the same names |
 | `castAndWaitForCd`, `castWithAdren`, `castIf`, `smartCast`, `castWithEffectStacks` | `Wait.` + the same names |
 | `makeX`, `makeXSelect`, `makeXConfirm`, `selectMakeCategory`, `makeXReaction` | `Wait.` + the same names |
 | `smithSetQuantity`, `smithSelectTier`, `smithSelectItem`, `smithMake` | `Wait.` + the same names |
@@ -341,6 +342,8 @@ compiles to a name Java cannot call. Every such call has a coordinate form:
 |---|---|
 | `thing.tile` | `thing.getTileX()`, `getTileY()`, `getPlane()` on NPCs, players, scene objects, ground items, lodestones, `TileArea` and the `ManualGroundItem` event; `getCenterX()`, `getCenterY()`, `getPlane()` on `DangerZone` |
 | `walkTo(tile, minimap)`, `dive(tile)` | `walkToTile(x, y[, plane][, minimap])`, `diveToTile(x, y[, plane])` |
+| `faceTile(tile)`, `surgeToward(tile)` | `Wait.faceTile(x, y)`, `Wait.surgeToward(x, y)` |
+| `InstanceAnchor(tile)`, `anchor.tile`, `anchor.tile(dx, dy)`, `anchor.contains(tile, ...)` | `new InstanceAnchor(x, y, plane)`, `getX()`, `getY()`, `getPlane()`, `worldX(dx)`, `worldY(dy)`, `contains(x, y, ...)` |
 | `findClosestObjectToTile(tile, ...)` and `findClosestReachableObjectToTile`, `findClosestObjectToTileWithOption` | the same names with `(x, y, plane, ...)` |
 | `interactClosestReachableObjectToTile(tile, ...)` | `interactClosestReachableObjectToTile(x, y, plane, ...)` |
 | `getAllObjectsWithinRange(tile, range)` | `getAllObjectsWithinRange(x, y, plane, range)` |
@@ -839,6 +842,99 @@ val flicker = PrayerFlicker(
         PrayerThreat.condition("Enrage", Prayer.DEFLECT_RANGE) { bossHealthPercent < 25 }.durationTicks(3),
     ),
 )
+```
+
+More ways to describe a threat:
+
+| Call | Live while |
+|---|---|
+| `PrayerThreat.projectile(name, prayer, id, lockedOnPlayer = true)` | A projectile with that id is locked onto the player, so one flying at a minion or another player is ignored |
+| `PrayerThreat.projectile(name, prayer, setOf(id1, id2), range, lockedOnPlayer)` | Any of several projectile ids is in flight |
+| `PrayerThreat.animation(name, prayer, setOf(npc1, npc2), range, anim1, anim2)` | Any of several NPC ids plays any of the animations, for bosses with many minion ids |
+| `PrayerThreat.dynamic(name, listOf(Prayer.DEFLECT_MAGIC, Prayer.DEFLECT_RANGE)) { ... }` | The block returns a prayer; it returns null when there is no threat. Use it when the prayer is only known at the time, such as two Jads alternating styles |
+
+A dynamic threat only ever uses the prayers you list, so the flicker can tell
+when the right one is already up; a prayer outside the list counts as no threat.
+`threat.currentPrayer()` tells you what any threat calls for right now.
+
+`protectionPrayerFor(style)` gives the protection prayer against a
+`CombatStyle` on the player's current prayer book: `PROTECT_MAGIC` on normal
+prayers, `DEFLECT_MAGIC` on curses. Pass `curses = true` or `false` to choose
+the book yourself.
+
+```kotlin
+val jads = PrayerThreat.dynamic("Jads", listOf(Prayer.DEFLECT_MAGIC, Prayer.DEFLECT_RANGE)) {
+    val jad = findClosestNPC(JAD, 30) ?: return@dynamic null
+    when (jad.animationId) {
+        JAD_MAGIC -> protectionPrayerFor(CombatStyle.MAGIC)
+        JAD_RANGED -> protectionPrayerFor(CombatStyle.RANGED)
+        else -> null
+    }
+}.priority(15).durationTicks(4)
+```
+
+`canUseProtectionPrayers` says whether protection prayers can be used right
+now; it is false while an attack has blocked them.
+
+**Target debuffs.** `Effect.BLOAT`, `Effect.DEATH_MARK` and `Effect.HAUNTED`
+name the Necromancy debuffs on your target, alongside `Effect.VULNERABILITY`
+and `Effect.STUNNED`. Read them with `activeOnOpponent`, for example
+`if (Effect.BLOAT.notActiveOnOpponent) castAbility("Bloat")`.
+
+**The extra action button.** Some fights show an extra button beside the
+action bar, such as Igneous Vengeance against TzKal-Zuk. `extraActionVisible`
+says whether it is on screen, and `clickExtraAction()` presses it, returning
+false without pressing when it is not there. Confirm on the fight's own
+outcome, and don't press it again on every pass while you wait for that:
+
+```kotlin
+if (energyFull && clickExtraAction()) delayUntil(gaussian(1800L, 300L)) { !extraActionVisible }
+```
+
+**Death's Office.** `inDeathsOffice` says whether the player is in Death's
+Office after dying. `reclaimFromDeath()` reclaims the lost items, paying from
+the coffer and confirming the payment if the game asks. It gives the office a
+few ticks to settle first, waits on every click, and returns true once the
+window has closed. Call it again on the next pass when it returns false.
+
+```kotlin
+if (inDeathsOffice) {
+    if (reclaimFromDeath()) WarsRetreat.teleport()
+    return
+}
+```
+
+**Instance anchors.** An instance lands somewhere new each time, so a boss
+script measures its arena from something that always stands in the same place
+in it, such as an NPC or a loc that never moves. `InstanceAnchor` holds that
+tile and converts offsets from it:
+
+| Call | What it gives you |
+|---|---|
+| `InstanceAnchor.ofNpc(id, range)` / `InstanceAnchor.ofLoc(id, range)` | An anchor on the nearest such NPC or loc, or null when there is none |
+| `InstanceAnchor.of(npc)` / `InstanceAnchor(x, y, plane)` / `InstanceAnchor(tile)` | An anchor on an entity or a tile you already have |
+| `anchor.tile(dx, dy)` / `anchor.worldX(dx)`, `anchor.worldY(dy)` | The world tile at an offset from the anchor |
+| `anchor.offsetX(x)`, `anchor.offsetY(y)` | How far a world tile is from the anchor |
+| `anchor.contains(x, y, minDx, minDy, maxDx, maxDy)` / `anchor.contains(tile, ...)` / `anchor.containsPlayer(...)` | Whether a tile, or the player, is inside a rectangle given in offsets, edges included |
+| `anchor.area(minDx, minDy, maxDx, maxDy)` | That rectangle as an `Area.Rectangular` |
+
+```kotlin
+val anchor = InstanceAnchor.ofNpc(ARENA_ANCHOR) ?: return
+if (!anchor.containsPlayer(-15, -35, 15, -4)) return
+walkTo(anchor.tile(9, -21), false)
+```
+
+Offsets are plain translations, so an anchor assumes the arena is not rotated.
+
+**Aiming Surge.** Surge and Escape fly the way the player faces.
+`faceTile(x, y)` steps one tile toward a point, along the nearest of the eight
+directions, and waits for the step to land, which leaves the player facing
+that way. `surgeToward(x, y)` does that and casts Surge the moment the step
+lands, returning whether the player surged. It does nothing when Surge is not
+on an action bar or is cooling down. Both take a `Tile` in Kotlin too.
+
+```kotlin
+if (quakeIncoming) surgeToward(anchor.worldX(0), anchor.worldY(-6))
 ```
 
 **Supplies.** `CombatSupplies` eats, drinks and keeps buffs up at thresholds you
