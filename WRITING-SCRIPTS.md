@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.30.0
+├── gradle.properties      <- projectxApiVersion=1.31.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -313,6 +313,7 @@ public Wait onLoop() {
 | `delayTicks`, `delayBetween`, `delay(mean, variance)` | `Wait.ticks`, `Wait.between`, `Wait.ms` |
 | `pauseOthersFor` | `Wait.pauseOthersFor` |
 | `webWalk`, `useLodestone`, `teleportWithGroupSystem` | `Wait.webWalk`, `Wait.useLodestone`, `Wait.teleportWithGroupSystem` |
+| `webWalkToArea`, `webWalkToTiles`, `findWebPathToArea` | `Wait.webWalkToArea`, `Wait.webWalkToTiles`, `Wait.findWebPathToArea` |
 | `randomizedWorldHop`, `randomizedWorldHopQuick`, `checkWorldPop`, `hopToWorld` | `Wait.randomizedWorldHop`, `Wait.randomizedWorldHopQuick`, `Wait.checkWorldPop`, `Wait.hopToWorld` |
 | `clickKey`, `findAndPickupItems`, `checkPorter`, `captureSerenSpirit` | `Wait.clickKey`, `Wait.findAndPickupItems`, `Wait.checkPorter`, `Wait.captureSerenSpirit` |
 | `togglePrayer`, `toggleQuickPrayers` | `Wait.togglePrayer`, `Wait.toggleQuickPrayers` |
@@ -502,9 +503,43 @@ Traversal.traversal(next = Banking(), finishedCondition = { bank.isOpen }) {
 ```
 
 The arrive distance is how close counts as there, in tiles with diagonals
-counting as one; it defaults to 2. To walk without any teleport, pass
-`useLodestones = false` in Kotlin, or `false` after the callback in Java:
-`Wait.webWalk(x, y, plane, 2, null, false)`.
+counting as one; it defaults to 2. The route goes to whichever tile of that
+square is quickest to reach, not to the destination itself; `findWebPath` and
+`canWebWalkTo` plan the same way. Pass 0 to stand on the exact tile. To walk
+without any teleport, pass `useLodestones = false` in Kotlin, or `false` after
+the callback in Java: `Wait.webWalk(x, y, plane, 2, null, false)`.
+
+#### Walking to an area
+
+When anywhere in a room, a clue's dig area or a fishing spot's shore will do,
+walk to the area itself. The route ends on whichever of its tiles is quickest
+to reach, including one a teleport, a staircase or a door lands you on, and the
+walk has arrived once you stand on any tile of it.
+
+```kotlin
+webWalkToArea(Area.Rectangular(3205, 3209, 3213, 3228, 0))
+webWalkToArea(minX = 3205, minY = 3209, maxX = 3213, maxY = 3228, plane = 0)
+webWalkToTiles(listOf(Tile.of(3092, 3245, 0), Tile.of(2809, 3439, 0)))
+val result = findWebPathToArea(area)   // plans without walking
+if (canWebWalkToArea(area)) { /* some tile of it is reachable */ }
+```
+
+```java
+return Wait.webWalkToArea(new Area.Rectangular(3205, 3209, 3213, 3228, 0), result -> {
+    if (!result.isSuccess()) System.out.println("Could not reach the room: " + result);
+});
+// Or: Wait.webWalkToArea(minX, minY, maxX, maxY, plane, onResult, useLodestones),
+// Wait.webWalkToTiles(xs, ys, plane, onResult, useLodestones) and
+// Wait.findWebPathToArea(area, onResult).
+```
+
+Any `Area` works: a rectangle, a circle or a polygon. A tile list may mix
+floors. The server plans to at most 4096 tiles, a 64 by 64 square. A bigger
+area is sent as its edge, because walking always enters an area across its
+edge. If the edge is still too big, only the 4096 edge tiles nearest you are
+sent. The one thing lost is a teleport that lands in the middle of a huge
+area. When the server can't be reached, the walker plans to the nearest tiles
+you can stand on, trying a few spread around the area until one is reachable.
 
 Two switches on `WebWalker` cover what a script may want to keep for itself:
 
