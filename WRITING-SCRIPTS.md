@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.31.0
+├── gradle.properties      <- projectxApiVersion=1.32.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -313,6 +313,7 @@ public Wait onLoop() {
 | `delayTicks`, `delayBetween`, `delay(mean, variance)` | `Wait.ticks`, `Wait.between`, `Wait.ms` |
 | `pauseOthersFor` | `Wait.pauseOthersFor` |
 | `webWalk`, `useLodestone`, `teleportWithGroupSystem` | `Wait.webWalk`, `Wait.useLodestone`, `Wait.teleportWithGroupSystem` |
+| `castTeleportSpell` | `Wait.castTeleportSpell` |
 | `webWalkToArea`, `webWalkToTiles`, `findWebPathToArea` | `Wait.webWalkToArea`, `Wait.webWalkToTiles`, `Wait.findWebPathToArea` |
 | `randomizedWorldHop`, `randomizedWorldHopQuick`, `checkWorldPop`, `hopToWorld` | `Wait.randomizedWorldHop`, `Wait.randomizedWorldHopQuick`, `Wait.checkWorldPop`, `Wait.hopToWorld` |
 | `clickKey`, `findAndPickupItems`, `checkPorter`, `captureSerenSpirit` | `Wait.clickKey`, `Wait.findAndPickupItems`, `Wait.checkPorter`, `Wait.captureSerenSpirit` |
@@ -609,8 +610,9 @@ from anywhere.
 | `INTERFACE` | Clicks a button, such as a spell | the click is the first of `chain` |
 | `POA` | Uses the Passage of the Abyss, then picks the jewellery and the place | `target` and `menu` |
 | `LODESTONE` | Teleports through the lodestone map | `lodestone` |
+| `SPELL` | Casts a teleport spell, a Spellbook Swap first when it is on another book | `spell` |
 
-`kind.isGlobal` is true for the last four. Anything a link does after its first
+`kind.isGlobal` is true for the last five. Anything a link does after its first
 action is its `chain`, in order: `WebInterfaceStep` clicks on an interface, and
 `WebObjectStep` uses of another object - a trapdoor is picked open, then climbed
 down. `steps` is the interface clicks alone, as before.
@@ -657,6 +659,33 @@ WebLinks.register(
 ```
 
 The walker waits for the dialog and picks the option whose text contains it.
+
+#### Teleport spells
+
+Routes can start with a teleport spell when that is quicker. `TeleportSpell`
+lists the ones the planner knows, by ability id (`TeleportSpell.VARROCK`,
+`TeleportSpell.byAbilityId(28)`, `TeleportSpell.named("Varrock")`); each has
+`spellName`, `magicLevel`, `spellbook` (null when it is on every book) and
+`destination`, read from the game cache. `currentSpellbook` is the book you are
+on.
+
+`canCastTeleportSpell(spell)` is true when the spell can be cast right now:
+unlocked, your Magic level with boosts, and the runes in the backpack, in rune
+pouches and from a worn staff, with the spell on an action bar or the magic
+book open. A spell on another book also needs that book's Spellbook Swap on an
+action bar, and its runes too. `teleportSpellProblem(spell)` says why not, or
+gives null. A few unlocks have no var to read (the Livid Farm spells, Mazcab,
+the Anachronia totem, the Ardougne cloak and Fur 'n Seek spells): those count
+as unlocked only while the spell is on one of your action bars.
+
+```kotlin
+if (canCastTeleportSpell(TeleportSpell.CAMELOT)) castTeleportSpell(TeleportSpell.CAMELOT)
+```
+
+`castTeleportSpell` swaps book first when it must, casts from the action bar
+or the open book, and returns true once you have landed. From Java:
+`Wait.castTeleportSpell(TeleportSpell.CAMELOT, landed -> ...)`. In a traversal,
+`castSpell(TeleportSpell.CAMELOT, destinationArea)` does the same as a node.
 
 `Lodestone.X.isUnlocked()` tells you whether a lodestone is unlocked, and
 `useLodestone(Lodestone.X)` teleports to one yourself. `openLodestoneMap()`
