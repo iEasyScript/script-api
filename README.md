@@ -3,8 +3,10 @@
 The public API for writing scripts against the Project X engine.
 
 Scripts can be written in **Kotlin or Java**, and the whole API works from both.
-The engine itself is closed source. This repository publishes the compiled API it
-exposes to scripts, so you can build scripts without the engine source.
+The engine is open source under the GPL-3.0 at
+[iEasyScript/engine](https://github.com/iEasyScript/engine), derived from
+[project-undercut/engine](https://gitlab.com/project-undercut/engine). This repository publishes the
+compiled API it exposes to scripts, so you can build scripts without building the engine.
 
 ## What is published
 
