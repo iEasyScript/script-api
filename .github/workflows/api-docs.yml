@@ -1,0 +1,78 @@
+name: api-docs
+
+# Rebuilds the API reference site from the engine tag a release was built from, every time a release is
+# published. Run it by hand to rebuild a release's docs, e.g. after changing the site's look.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "API version to document, e.g. 1.32.0 (default: the latest release)"
+        required: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve the release and its engine tag
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED: ${{ github.event.release.tag_name || inputs.version }}
+        run: |
+          set -eu
+          tag="${REQUESTED:-$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName)}"
+          tag="v${tag#v}"
+          engine="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json body -q .body |
+            grep -oiE "requires engine [0-9]+\.[0-9]+\.[0-9]+" | head -1 | grep -oE "[0-9]+\.[0-9]+\.[0-9]+" || true)"
+          [ -n "$engine" ] || { echo "release $tag does not say which engine it needs" >&2; exit 1; }
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          echo "engine=v$engine" >> "$GITHUB_OUTPUT"
+          echo "API ${tag#v} <- engine v$engine"
+      - uses: actions/checkout@v4
+        with:
+          repository: iEasyScript/engine
+          ref: ${{ steps.release.outputs.engine }}
+          path: engine
+          submodules: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Generate the reference
+        working-directory: engine
+        env:
+          API_VERSION: ${{ steps.release.outputs.version }}
+          ENGINE_TAG: ${{ steps.release.outputs.engine }}
+          API_DOCS_DIR: ${{ github.workspace }}/.github/docs
+        run: |
+          chmod +x ./gradlew
+          ./gradlew --no-configuration-cache -I "$API_DOCS_DIR/api-docs.init.gradle.kts" \
+            :client-plugin-engine:dokkaGeneratePublicationHtml
+          touch client-plugin-engine/build/dokka/html/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: engine/client-plugin-engine/build/dokka/html
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

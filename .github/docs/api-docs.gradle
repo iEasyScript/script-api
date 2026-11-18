@@ -1,0 +1,44 @@
+// Groovy, so the Dokka types resolve at runtime from the root classpath the init script put them on.
+def apiVersion = System.getenv('API_VERSION') ?: 'dev'
+def engineTag = System.getenv('ENGINE_TAG') ?: 'main'
+def docsDir = new File(System.getenv('API_DOCS_DIR'))
+
+// The packages the API changelog treats as public; everything else in the engine is suppressed.
+def apiPackages = /com\.projectx\.(script|webwalker|game\.interfaces|game\.nxt\.entity|ui\.compose\.components|ui\.compose\.theme|ui\.backend\.dsl)(\..*)?/
+def partialPackages = ['com/projectx/ui': ['Setting.kt'], 'com/projectx/ui/compose': ['OverlayInput.kt']]
+def enginePlumbing = ['ScriptLoader.kt', 'ScriptExecutor.kt', 'ClientPulseDispatcher.kt', 'InMemoryJar.kt', 'LiveValues.kt']
+
+pluginManager.apply('org.jetbrains.dokka')
+def sourceRoot = file('src/main/kotlin')
+def visibility = extensions.getByName('dokka').class.classLoader
+    .loadClass('org.jetbrains.dokka.gradle.engine.parameters.VisibilityModifier')
+def hidden = partialPackages.collectMany { dir, keep ->
+    (new File(sourceRoot, dir).listFiles() ?: []).findAll { it.isFile() && !(it.name in keep) }
+} + enginePlumbing.collect { new File(sourceRoot, "com/projectx/script/$it") }
+
+dokka {
+    moduleName.set('Project X Script API')
+    moduleVersion.set(apiVersion)
+    dokkaSourceSets.configureEach {
+        includes.from(new File(docsDir, 'module.md'))
+        documentedVisibilities.set([visibility.valueOf('Public'), visibility.valueOf('Protected')] as Set)
+        reportUndocumented.set(false)
+        skipEmptyPackages.set(true)
+        jdkVersion.set(25)
+        perPackageOption {
+            matchingRegex.set(/(?!(?:${apiPackages}|com\.projectx\.ui|com\.projectx\.ui\.compose)$).*/.toString())
+            suppress.set(true)
+        }
+        suppressedFiles.from(hidden)
+        sourceLink {
+            localDirectory.set(sourceRoot)
+            remoteUrl("https://github.com/iEasyScript/engine/blob/${engineTag}/client-plugin-engine/src/main/kotlin")
+            remoteLineSuffix.set('#L')
+        }
+    }
+    pluginsConfiguration.html {
+        customStyleSheets.from(new File(docsDir, 'theme.css'))
+        footerMessage.set("Project X Script API ${apiVersion} · built from engine ${engineTag}")
+        homepageLink.set('https://github.com/iEasyScript/script-api')
+    }
+}

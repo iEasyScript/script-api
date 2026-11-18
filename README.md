@@ -8,6 +8,9 @@ The engine is open source under the GPL-3.0 at
 [project-undercut/engine](https://gitlab.com/project-undercut/engine). This repository publishes the
 compiled API it exposes to scripts, so you can build scripts without building the engine.
 
+**[Browse the API reference](https://ieasyscript.github.io/script-api/)**: every class, function and property
+scripts can use, searchable, with a link from each one to its source. It is rebuilt for every release.
+
 ## What is published
 
 Each release carries two jars:
