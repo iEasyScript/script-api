@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.32.0
+├── gradle.properties      <- projectxApiVersion=1.33.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -762,6 +762,33 @@ anything otherwise.
 
 `clickKey` is unchanged: it sends a bare key-down and key-up with no character,
 which is right for keybinds but types nothing into a text field.
+
+### Running clientscripts
+
+The client's own clientscripts (CS2) can be run from a script, exactly as if the
+client had called them. Find one by its Jagex name with `clientScriptId`, which
+takes the full name (`"[proc,quicksort]"`) or just the part after the comma:
+
+```kotlin
+val id = clientScriptId("[proc,my_proc]") ?: return
+runClientScript(id, 12, "text")                        // fire and forget, on the next tick
+val result = runClientScriptForResult(id, 12, "text")  // suspends until it has run
+val value = result?.int                                // the last int it returned
+```
+
+- Arguments are `Int`, `Long` or `String`, in the order the script declares them.
+- `runClientScriptForResult` returns the values the script left on its stacks
+  (`ints`, `longs`, `strings`, with the last of each in `int`, `long` and
+  `string`), or null when clientscripts can't run yet (`clientScriptsReady` is
+  false until the client has run one of its own) or the run takes longer than
+  `CLIENT_SCRIPT_TIMEOUT_MS`.
+- It suspends rather than blocking, so it is safe anywhere in a script.
+- A clientscript that acts on an interface sends the same packets the client
+  would, so treat one like any other click: only run it when you mean to.
+
+From Java, return `Wait.runClientScriptForResult(id, new Object[] {12, "text"},
+result -> ...)` from `loop()`, and call `ClientScriptsKt.runClientScript` or
+`ClientScriptsKt.clientScriptId` directly.
 
 ### The Grand Exchange
 
