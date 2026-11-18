@@ -20,6 +20,7 @@ source, so it always matches the release you compile against.
 | `com.projectx.webwalker` | `webWalk`, links and paths |
 | `com.projectx.game.nxt.entity` | Players, NPCs, objects and ground items |
 | `com.projectx.game.interfaces` | Reading and clicking game interfaces |
+| `com.projectx.game.cs2` | Running the client's own clientscripts |
 | `com.projectx.ui.backend.dsl` | The overlay DSL |
 | `com.projectx.ui.compose` | Compose panels for a script's overlay |
 

@@ -4,7 +4,7 @@ def engineTag = System.getenv('ENGINE_TAG') ?: 'main'
 def docsDir = new File(System.getenv('API_DOCS_DIR'))
 
 // The packages the API changelog treats as public; everything else in the engine is suppressed.
-def apiPackages = /com\.projectx\.(script|webwalker|game\.interfaces|game\.nxt\.entity|ui\.compose\.components|ui\.compose\.theme|ui\.backend\.dsl)(\..*)?/
+def apiPackages = /com\.projectx\.(script|webwalker|game\.interfaces|game\.nxt\.entity|game\.cs2|ui\.compose\.components|ui\.compose\.theme|ui\.backend\.dsl)(\..*)?/
 def partialPackages = ['com/projectx/ui': ['Setting.kt'], 'com/projectx/ui/compose': ['OverlayInput.kt']]
 def enginePlumbing = ['ScriptLoader.kt', 'ScriptExecutor.kt', 'ClientPulseDispatcher.kt', 'InMemoryJar.kt', 'LiveValues.kt']
 

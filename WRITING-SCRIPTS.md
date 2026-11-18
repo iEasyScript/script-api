@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.33.0
+├── gradle.properties      <- projectxApiVersion=1.34.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -328,7 +328,7 @@ public Wait onLoop() {
 | `bobStore`, `bobWithdraw` (pairs) | `Wait.bobStoreById` / `bobStoreByName`, `Wait.bobWithdrawById` / `bobWithdrawByName` (a `Map` of amounts) |
 | `joinInstance`, `confirmInstanceDialogue`, `startOrRejoinInstance` | `Wait.` + the same names |
 | `typeText`, `pressKey` | `Wait.` + the same names |
-| `enterBankPin`, `openNearestBank` | `Wait.` + the same names |
+| `enterBankPin`, `openNearestBank`, `loadLastPresetNearestBank` | `Wait.` + the same names |
 | `fillOreBox` | `Wait.fillOreBox` |
 | `geOpen`, `geBuy`, `geSell`, `geAbort`, `geCollectAll`, `awaitGrandExchangePrices` | `Wait.` + the same names; `Wait.geBuyInSlot` / `geSellInSlot` to pick the slot |
 
@@ -1098,6 +1098,19 @@ if (openNearestBank(settings.bankPin.value.ifBlank { null })) depositBankInvento
 
 It banks across a counter too, as at the Grand Exchange, where the bankers
 can't be walked up to.
+
+**Load Last Preset at the nearest bank.** `loadLastPresetNearestBank()` clicks
+Load Last Preset on the bank in reach, or walks to the nearest bank in `Banks`
+and clicks it there. It returns true once the preset was clicked; the preset
+loads without opening the bank, so wait for the backpack to change to know it
+landed.
+
+```kotlin
+if (inventory.isFull) {
+    val before = inventory.map { it.id to it.amount }
+    if (loadLastPresetNearestBank()) delayUntil(gaussian(16_000L, 3_000L)) { inventory.map { it.id to it.amount } != before }
+}
+```
 
 **Items' own bank options.** Some items add their own options to the bank's
 backpack, such as an essence pouch's "Fill" or an ore box's "Empty - ore".
