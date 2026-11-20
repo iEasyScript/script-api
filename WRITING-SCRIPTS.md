@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.34.0
+├── gradle.properties      <- projectxApiVersion=1.35.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -330,6 +330,7 @@ public Wait onLoop() {
 | `typeText`, `pressKey` | `Wait.` + the same names |
 | `enterBankPin`, `openNearestBank`, `loadLastPresetNearestBank` | `Wait.` + the same names |
 | `fillOreBox` | `Wait.fillOreBox` |
+| `dropItems` | `Wait.dropItems` (a `Predicate<Item>`) |
 | `geOpen`, `geBuy`, `geSell`, `geAbort`, `geCollectAll`, `awaitGrandExchangePrices` | `Wait.` + the same names; `Wait.geBuyInSlot` / `geSellInSlot` to pick the slot |
 
 Kotlin lambdas become Java types in these factories: a condition is a
@@ -394,6 +395,7 @@ Use these instead of writing your own:
 | `useInventoryOrActionBarItem(option, itemIds...)` | Use an item from the pack, or the action bar if it is not there |
 | `getInventory().findByNameContaining(text)` | The first item whose name contains `text` |
 | `getInventory().getUsedSlots()` | How many slots are filled |
+| `dropItems { item -> ... }` | Drops every backpack item the filter picks, one at a time, waiting for each slot to empty before the next; returns how many were dropped |
 | `isPlayerIdle()`, `isPlayerBusy()`, `isDiveReady()` | Player state checks |
 | `npc.headbarFill(type)` | The current fill of an NPC's or player's headbar of that type, or -1 while it is not shown |
 
@@ -979,7 +981,7 @@ false without pressing when it is not there. Confirm on the fight's own
 outcome, and don't press it again on every pass while you wait for that:
 
 ```kotlin
-if (energyFull && clickExtraAction()) delayUntil(gaussian(1800L, 300L)) { !extraActionVisible }
+if (energyFull && clickExtraAction()) delayUntil(gaussian(1800L, 90_000L)) { !extraActionVisible }
 ```
 
 **Death's Office.** `inDeathsOffice` says whether the player is in Death's
@@ -1108,7 +1110,7 @@ landed.
 ```kotlin
 if (inventory.isFull) {
     val before = inventory.map { it.id to it.amount }
-    if (loadLastPresetNearestBank()) delayUntil(gaussian(16_000L, 3_000L)) { inventory.map { it.id to it.amount } != before }
+    if (loadLastPresetNearestBank()) delayUntil(gaussian(16_000L, 9_000_000L)) { inventory.map { it.id to it.amount } != before }
 }
 ```
 
