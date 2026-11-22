@@ -1,7 +1,8 @@
 # Module Project X Script API
 
 The API scripts are written against, in **Kotlin or Java**. Every page here is generated from the engine's own
-source, so it always matches the release you compile against.
+source, so it always matches the release you compile against. Use the **Kotlin | Java** switch at the top to see
+every signature as you would call it from your language.
 
 **Start here**
 

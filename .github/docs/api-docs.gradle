@@ -2,6 +2,7 @@
 def apiVersion = System.getenv('API_VERSION') ?: 'dev'
 def engineTag = System.getenv('ENGINE_TAG') ?: 'main'
 def docsDir = new File(System.getenv('API_DOCS_DIR'))
+def java = System.getenv('API_DOCS_LANGUAGE') == 'java'
 
 // The packages the API changelog treats as public; everything else in the engine is suppressed.
 def apiPackages = /com\.projectx\.(script|webwalker|game\.interfaces|game\.nxt\.entity|game\.cs2|ui\.compose\.components|ui\.compose\.theme|ui\.backend\.dsl)(\..*)?/
@@ -9,6 +10,8 @@ def partialPackages = ['com/projectx/ui': ['Setting.kt'], 'com/projectx/ui/compo
 def enginePlumbing = ['ScriptLoader.kt', 'ScriptExecutor.kt', 'ClientPulseDispatcher.kt', 'InMemoryJar.kt', 'LiveValues.kt']
 
 pluginManager.apply('org.jetbrains.dokka')
+// The Java site renders every signature the way a Java script calls it, e.g. extensions as static methods.
+if (java) dependencies.add('dokkaPlugin', 'org.jetbrains.dokka:kotlin-as-java-plugin:2.3.0')
 def sourceRoot = file('src/main/kotlin')
 def visibility = extensions.getByName('dokka').class.classLoader
     .loadClass('org.jetbrains.dokka.gradle.engine.parameters.VisibilityModifier')
@@ -19,6 +22,7 @@ def hidden = partialPackages.collectMany { dir, keep ->
 dokka {
     moduleName.set('Project X Script API')
     moduleVersion.set(apiVersion)
+    if (java) dokkaPublications.named('html') { outputDirectory.set(layout.buildDirectory.dir('dokka/html-java')) }
     dokkaSourceSets.configureEach {
         includes.from(new File(docsDir, 'module.md'))
         documentedVisibilities.set([visibility.valueOf('Public'), visibility.valueOf('Protected')] as Set)
@@ -37,8 +41,8 @@ dokka {
         }
     }
     pluginsConfiguration.html {
-        customStyleSheets.from(new File(docsDir, 'theme.css'))
-        footerMessage.set("Project X Script API ${apiVersion} · built from engine ${engineTag}")
+        customStyleSheets.from(new File(docsDir, 'theme.css'), new File(docsDir, 'language-toggle.js'))
+        footerMessage.set("Project X Script API ${apiVersion} (${java ? 'Java' : 'Kotlin'}) · built from engine ${engineTag}")
         homepageLink.set('https://github.com/iEasyScript/script-api')
     }
 }

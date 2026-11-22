@@ -60,8 +60,11 @@ jobs:
           API_DOCS_DIR: ${{ github.workspace }}/.github/docs
         run: |
           chmod +x ./gradlew
-          ./gradlew --no-configuration-cache -I "$API_DOCS_DIR/api-docs.init.gradle.kts" \
-            :client-plugin-engine:dokkaGeneratePublicationHtml
+          for language in kotlin java; do
+            API_DOCS_LANGUAGE=$language ./gradlew --no-configuration-cache -I "$API_DOCS_DIR/api-docs.init.gradle.kts" \
+              :client-plugin-engine:dokkaGeneratePublicationHtml
+          done
+          cp -r client-plugin-engine/build/dokka/html-java client-plugin-engine/build/dokka/html/java
           touch client-plugin-engine/build/dokka/html/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         with:

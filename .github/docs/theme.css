@@ -3,3 +3,42 @@
     --active-tab-border-color: #c9a227;
     --hover-link-color: #c9a227;
 }
+
+.language-toggle {
+    display: inline-flex;
+    align-self: center;
+    margin-right: 12px;
+    padding: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 6px;
+}
+
+.language-toggle--option {
+    padding: 4px 12px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.7);
+    font: inherit;
+    font-size: 14px;
+    line-height: 20px;
+    cursor: pointer;
+}
+
+.language-toggle--option:hover:not(.language-toggle--option_active) {
+    color: #fff;
+}
+
+.language-toggle--option_active {
+    background: var(--color-key-blue);
+    color: #19191c;
+    cursor: default;
+}
+
+.kotlin-only-note {
+    margin: 0 0 16px;
+    padding: 10px 14px;
+    border-left: 4px solid var(--color-key-blue);
+    border-radius: 4px;
+    background: rgba(201, 162, 39, 0.12);
+}

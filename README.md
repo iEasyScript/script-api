@@ -9,7 +9,9 @@ The engine is open source under the GPL-3.0 at
 compiled API it exposes to scripts, so you can build scripts without building the engine.
 
 **[Browse the API reference](https://ieasyscript.github.io/script-api/)**: every class, function and property
-scripts can use, searchable, with a link from each one to its source. It is rebuilt for every release.
+scripts can use, searchable, with a link from each one to its source. It is rebuilt for every release. A
+**Kotlin | Java** switch at the top shows every signature in either language
+([Java view](https://ieasyscript.github.io/script-api/java/)).
 
 ## What is published
 
