@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.35.0
+├── gradle.properties      <- projectxApiVersion=1.36.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -331,7 +331,8 @@ public Wait onLoop() {
 | `enterBankPin`, `openNearestBank`, `loadLastPresetNearestBank` | `Wait.` + the same names |
 | `fillOreBox` | `Wait.fillOreBox` |
 | `dropItems` | `Wait.dropItems` (a `Predicate<Item>`) |
-| `geOpen`, `geBuy`, `geSell`, `geAbort`, `geCollectAll`, `awaitGrandExchangePrices` | `Wait.` + the same names; `Wait.geBuyInSlot` / `geSellInSlot` to pick the slot |
+| `geOpen`, `geBuy`, `geBuyAtGuidePrice`, `geSell`, `geAbort`, `geCollectAll`, `awaitGrandExchangePrices` | `Wait.` + the same names; `Wait.geBuyInSlot` / `geBuyAtGuidePriceInSlot` / `geSellInSlot` to pick the slot |
+| `webWalkToObject` | `Wait.webWalkToObject(obj, onResult, useLodestones)` |
 
 Kotlin lambdas become Java types in these factories: a condition is a
 `BooleanSupplier`, and a name match is a `Predicate<String>`.
@@ -568,6 +569,24 @@ route is planned around it, so one bad link does not end the walk.
 | `STUCK` | The player stopped making progress, even after planning again |
 | `STOPPED` | The script stopped while walking |
 | `OTHER_FLOOR` | No longer produced: routes cross floors. Kept so older scripts still compile |
+
+#### Walking to an object
+
+To use an object, walk to a tile it can be used from rather than to the object
+itself. `webWalkToObject(obj)` does that, so a door or a wall between you and
+the object is part of the route instead of in the way, as with a bookcase
+inside a room whose door is shut. `objectInteractTiles(obj)` lists those tiles.
+
+```kotlin
+suspend fun Script.search(bookcase: SceneObject): Boolean =
+    webWalkToObject(bookcase).isSuccess && bookcase.interactOrFirst("Search")
+```
+
+```java
+return Wait.webWalkToObject(bookcase, result -> {
+    if (!result.isSuccess()) System.out.println("Could not reach it: " + result);
+}, true);
+```
 
 #### Looking at a route without walking it
 
@@ -819,14 +838,28 @@ Actions wait for the server's answer and return whether it worked:
 |---|---|
 | `geOpen()` | Opens the exchange through the nearest clerk or banker |
 | `geBuy(itemId, quantity, price)` | Searches for the item, sets quantity and price, confirms |
+| `geBuyAtGuidePrice(itemId, quantity, percentAbove)` | The same, priced at the exchange's own guide price plus `percentAbove` percent |
 | `geSell(itemId, quantity, price)` | Offers the item from the backpack, noted or not |
 | `geAbort(slot)` | Aborts an offer and waits until it has finished |
 | `geCollectAll()` | Collects every slot (coins go to the money pouch) |
 
-`geBuy` and `geSell` use the first empty slot unless you pass one. They return
-false if the window is not open, the slot is taken or locked, or the item cannot
-be found, typed or offered. The exchange can ask you to confirm a sale far below
-the guide price; that prompt is not answered for you, so the call returns false.
+`geBuy`, `geBuyAtGuidePrice` and `geSell` use the first empty slot unless you
+pass one. They return false if the window is not open, the slot is taken or
+locked, or the item cannot be found, typed or offered. A buy checks the item on
+the offer screen before confirming, so an item that shares its name with
+another (a strung and an unstrung amulet) is never bought by mistake.
+
+`geBuyAtGuidePrice` reads the guide price from the offer screen once it shows
+this item's, which suits items too rarely traded for the wiki's live prices to
+mean much. The exchange refunds the difference when an offer fills below its
+price, so a few percent over guide costs nothing extra and fills faster:
+
+```kotlin
+if (!geBuyAtGuidePrice(itemId = 1381, quantity = 1, percentAbove = 5)) println("Couldn't place the offer")
+```
+
+`geSell` also returns false when the exchange asks you to confirm a sale far
+below the guide price; that prompt is not answered for you.
 
 The exchange withholds 2% of each sale, rounded down per item; items sold for
 under 50 coins and bonds are exempt. Buy limits run for four hours from the first
@@ -1112,6 +1145,17 @@ if (inventory.isFull) {
     val before = inventory.map { it.id to it.amount }
     if (loadLastPresetNearestBank()) delayUntil(gaussian(16_000L, 9_000_000L)) { inventory.map { it.id to it.amount } != before }
 }
+```
+
+**Withdrawing by id.** `withdrawBankItem(itemId, amount)` withdraws one exact
+item while the bank is open, where a name could match several (a strung and an
+unstrung amulet, or two snelms). `amount` is 1, 5, 10 or 50, or 0 (the default)
+for all of it; any other amount returns false. It returns whether the click
+went through, so wait for the backpack to change before counting on it. Items
+far down a large bank work too.
+
+```kotlin
+if (withdrawBankItem(1698, 1)) delayUntil(gaussian(2400L, 360_000L)) { inventory.any { it.id == 1698 } }
 ```
 
 **Items' own bank options.** Some items add their own options to the bank's
