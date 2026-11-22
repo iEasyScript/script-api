@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.36.0
+├── gradle.properties      <- projectxApiVersion=1.37.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -327,7 +327,7 @@ public Wait onLoop() {
 | `bobGiveAllItems`, `bobTakeAllItems`, `bobGiveItem`, `bobTake` | `Wait.` + the same names |
 | `bobStore`, `bobWithdraw` (pairs) | `Wait.bobStoreById` / `bobStoreByName`, `Wait.bobWithdrawById` / `bobWithdrawByName` (a `Map` of amounts) |
 | `joinInstance`, `confirmInstanceDialogue`, `startOrRejoinInstance` | `Wait.` + the same names |
-| `typeText`, `pressKey` | `Wait.` + the same names |
+| `typeText`, `pressKey`, `performEmote` | `Wait.` + the same names |
 | `enterBankPin`, `openNearestBank`, `loadLastPresetNearestBank` | `Wait.` + the same names |
 | `fillOreBox` | `Wait.fillOreBox` |
 | `dropItems` | `Wait.dropItems` (a `Predicate<Item>`) |
@@ -783,6 +783,34 @@ anything otherwise.
 
 `clickKey` is unchanged: it sends a bare key-down and key-up with no character,
 which is right for keybinds but types nothing into a text field.
+
+### Emotes
+
+`performEmote(name)` plays an emote from the emote tab by the name the tab
+shows, ignoring case, and waits for the animation to start. It returns false
+when the name is unknown, the emote tab is not open, or nothing started.
+`Emotes.names` lists every emote in the tab's order and `Emotes.slot(name)`
+finds one's slot, or -1. Both are read from the game's own emote list.
+
+```kotlin
+if (performEmote("Jump For Joy")) delayUntil(gaussian(6000L, 1_000_000L)) { findClosestNPC("Uri") != null }
+```
+
+### Dialogues
+
+`continueDialogue()` clicks "Click here to continue" on whichever chat box is
+showing: an NPC or player line, an item box or a plain message box. It returns
+false when none is. To answer a question, `dialogueOptions` maps each option's
+text to the button that picks it, and `continueDialogueContaining(text)` picks
+the first option containing `text`. Wait for the box to change after each
+click rather than clicking again straight away.
+
+```kotlin
+while (isDialogOpen()) {
+    if (!continueDialogueContaining("something else") && !continueDialogue()) break
+    delayUntil(gaussian(1400L, 90_000L)) { !isDialogOpen() }
+}
+```
 
 ### Running clientscripts
 
