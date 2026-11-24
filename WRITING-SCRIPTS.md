@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.37.0
+├── gradle.properties      <- projectxApiVersion=1.38.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -328,6 +328,7 @@ public Wait onLoop() {
 | `bobStore`, `bobWithdraw` (pairs) | `Wait.bobStoreById` / `bobStoreByName`, `Wait.bobWithdrawById` / `bobWithdrawByName` (a `Map` of amounts) |
 | `joinInstance`, `confirmInstanceDialogue`, `startOrRejoinInstance` | `Wait.` + the same names |
 | `typeText`, `pressKey`, `performEmote` | `Wait.` + the same names |
+| `solvePuzzleBox`, `takeFromClueCarrier` | `Wait.` + the same names |
 | `enterBankPin`, `openNearestBank`, `loadLastPresetNearestBank` | `Wait.` + the same names |
 | `fillOreBox` | `Wait.fillOreBox` |
 | `dropItems` | `Wait.dropItems` (a `Predicate<Item>`) |
@@ -810,6 +811,25 @@ while (isDialogOpen()) {
     if (!continueDialogueContaining("something else") && !continueDialogue()) break
     delayUntil(gaussian(1400L, 90_000L)) { !isDialogOpen() }
 }
+```
+
+### Treasure trails
+
+`solvePuzzleBox()` solves an open sliding-tile puzzle box. It moves the gap
+with the arrow keys one slide at a time, waits for each slide to land, and
+plans again if the board isn't what it expected; once the picture is complete
+it presses Check and closes the box. It returns false when no box is open or
+the board couldn't be solved. `puzzleBoxOpen` says whether one is open.
+
+`takeFromClueCarrier(itemName)` takes one item, such as
+`"Sealed clue scroll (hard)"`, out of Charos' clue carrier in the backpack,
+opening and closing its window as needed, and returns true once one more is
+in the backpack. `clueCarrier` is what the carrier holds; it reads as empty
+until the carrier has been opened once this session.
+
+```kotlin
+if (inventory.count("Sealed clue scroll (hard)") == 0) takeFromClueCarrier("Sealed clue scroll (hard)")
+if (puzzleBoxOpen && !solvePuzzleBox()) log("Couldn't solve the puzzle box")
 ```
 
 ### Running clientscripts
