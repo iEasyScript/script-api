@@ -459,11 +459,14 @@ The link set and its routing come from Query's
 [navpathService](https://github.com/ShaggyHW/navpathService), used with his
 permission.
 
-Routes are planned on the Project X server, which runs navpathService for every
-signed-in player: it plans Surge and Dive into the route and varies routes from
-player to player. When the server can't be reached the walker plans the route
-itself from the same links, so a script never waits on it. Set
-`WebWalker.useHostedPlanner = false` to plan locally only.
+Routes are planned by navpathService running on the player's own machine. The
+launcher installs it, keeps it and its map up to date, and runs one copy that every
+client shares, so a route comes back in milliseconds. It plans Surge and Dive into
+the route and varies routes from player to player. The map it plans on holds the
+links we measured as well as upstream's. Walking needs it running: with no
+launcher-run planner, a walk ends with `NO_PATH` and a message saying to start the
+launcher. `WebWalker.useHostedPlanner` is kept so existing scripts load, and does
+nothing.
 
 While walking it reads the live map: doors that already stand open are walked
 through, shut ones are opened from a few steps away, a locked door is routed
