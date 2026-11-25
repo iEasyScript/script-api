@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.38.0
+├── gradle.properties      <- projectxApiVersion=1.39.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -165,6 +165,7 @@ accident.
 | `Wait.event(predicate, timeoutMs)` | Until an event the predicate accepts arrives |
 | `Wait.chatContaining(type, text)` | Until a chat message of that type containing the text |
 | `Wait.webWalk(x, y, plane)` | Walks there from anywhere on the world map: stairs, ladders, shortcuts, doors, boats and other NPC transport, fairy rings, and teleports when they get there sooner; see [Walking anywhere](#walking-anywhere-the-web-walker) |
+| `Wait.traversal(nodes, finished, interrupt, noMovementTimeoutMs, onResult)` | Drives traversal nodes built with `JavaTraversal.nodes` until `finished` holds, `interrupt` fires or the player stands still too long |
 | `Wait.ticks(ticks, minJitter, maxJitter)` | Game ticks plus a jitter picked between `minJitter` and `maxJitter` ms |
 | `Wait.sequence(step, step, ...)` | Runs steps in order, each performing its own wait |
 | `Wait.loop(step)` | Runs a step again and again, performing its wait each time, until it returns `null` |
@@ -230,6 +231,21 @@ A slower pace costs reaction time: whatever you watch for is noticed up to one
 pass later. Anything that has to react at once - a floor marker landing under
 you, a boss's animation - either keeps the default or uses `shouldInterrupt()`
 below, which is polled while your script waits whatever the pace.
+
+`onTickLoop()` runs once per server tick on the game thread, even while your
+loop is waiting. Use it to watch, never to wait or click. In a state machine the
+current state gets it too: `stateTickLoop()` in Kotlin, `onTickLoop(script)` on
+a `JavaState`; an override of the script's own `onTickLoop` must call super.
+
+`ServerTick` lines work up against the game's clock: `ServerTick.millisIntoTick`
+is how far into the current 600 ms tick (`ServerTick.TICK_MILLIS`) you are,
+`lastTickNanoTime` when the last one ended on the `System.nanoTime` clock, and
+`millisIntoTickAtSend()` how far into its tick an action asked for now will
+actually go out. `HumanTiming.reactionMs()`, `actionGapMs()` and
+`between(lo, hi)` draw human-shaped delays, and `ActionPacer.ACTIONS.await()`
+waits for the next human-spaced slot before an action. The dive and Surge
+combos below pace themselves this way; your own clicks still need the habit in
+[The one habit that matters](#3-the-one-habit-that-matters).
 
 ### Logging
 
@@ -400,6 +416,15 @@ Use these instead of writing your own:
 | `dropItems { item -> ... }` | Drops every backpack item the filter picks, one at a time, waiting for each slot to empty before the next; returns how many were dropped |
 | `isPlayerIdle()`, `isPlayerBusy()`, `isDiveReady()` | Player state checks |
 | `npc.headbarFill(type)` | The current fill of an NPC's or player's headbar of that type, or -1 while it is not shown |
+| `npcByServerIndex(index)` | The NPC with that server index, e.g. a player's `target_index`, or null |
+| `isComponentOnScreen(interfaceId, componentId)` | Whether the component is actually drawn now, not just its interface open |
+| `IFSlot(interfaceId, componentId, slot).ops` | The live op names of an interface slot; `click("Eat")` clicks one by name, `optionIndexOf("Eat")` gives its number |
+| `entity.facingAngle`, `facing()`, `isFacing(tile, degrees)`, `isFacingAway(...)` | Which way an NPC or player is turned: a bearing (0 north, 90 east), the nearest `Direction`, or a check against a tile; `Bearings` has the maths |
+| `entity.serverTile` | Where the server has the entity, ahead of the drawn model while it walks |
+| `dive(tile, Ability.BLADED_DIVE)`, `diveThenSurge(tile, dive)`, `surgeThenDive(tile, dive)` | A dive, or a dive and Surge sent as one motion; the combos return how many hops went out |
+| `Quests.isCompleted("Cook's Assistant")`, `Quests.progress(id)` | Quest state from the cache's quest definitions, by name or id |
+| `item.hasPerk(Perk.EQUILIBRIUM)`, `Perks.of(item)`, `Perks.rank(item, perk)` | Invention perks on an augmented item |
+| `AttackMemory.isUnderAttack()`, `attackedRecently()` | Whether an NPC is attacking you, remembered for a few seconds after |
 
 | `getVarps().getVar(id)` / `getVarps().getVarBit(id)` | Any player var |
 
@@ -643,8 +668,8 @@ action is its `chain`, in order: `WebInterfaceStep` clicks on an interface, and
 down. `steps` is the interface clicks alone, as before.
 
 Some links are gated - an agility level, a quest varbit, coins for a fare. Those
-conditions read live game state, so they are evaluated once on the game thread
-before the search starts (`WebLinkPermissions.snapshot()`), and a link the
+conditions read live game state, so they are valued once on the game thread
+before the search starts and sent with the route request, and a link the
 account cannot use is left out of the route. A condition the engine does not
 recognise counts as met, so an unknown gate costs a re-plan rather than making a
 place unreachable.
@@ -652,38 +677,28 @@ place unreachable.
 A link that uses an item is only taken while the item is carried. The link set
 is curated, so a route that needs something not in it reports `NO_PATH`.
 
-If your script finds its own way somewhere the set does not cover, hand it to
-the walker and later routes are planned straight through it:
-
-```kotlin
-// Standing at `from`, clicking object 130300's "Climb-up" put us at `to`.
-WebLinks.registerObjectLink(
-    from.x, from.y, from.plane,
-    to.x, to.y, to.plane,
-    objectId = 130300, action = "Climb-up", costTiles = 3,
-)
-```
-
-Registering the same way through twice is a no-op, and registered links last
-until the client restarts.
-
 Some ways through ask where to go rather than simply moving you - Kharid-et's
-fort entrance opens a "Choose destination." list, and the player stays outside
-until it is answered. A link carries its answer:
+fort entrance opens a "Choose destination." list. The walker waits for the
+dialog and picks the option the link names.
+
+`WebLinks.register`, `WebLinks.registerObjectLink` and `WebLinkPermissions` are
+deprecated. Routes are planned only on the launcher's navpath map, so a link a
+script registers is listed in `WebLinks.all` but never routed through. Scripts
+built against them still load. A way through the set lacks belongs in the
+engine's `links.json`; ask for it to be added.
+
+#### Changing how a walk routes
+
+`WebWalker.options` holds the options every web walk routes with. Turn
+`teleports`, `useItems` or `hops` off, or set `surge` and `dive`, for the rest
+of the run:
 
 ```kotlin
-WebLinks.register(
-    WebLink(
-        kind = WebLinkKind.OBJECT,
-        from = WebArea(3372, 3376, 3179, 3183, 0),
-        to = WebArea(2445, 2449, 7615, 7619, 0),
-        cost = 3000, action = "Enter", objectId = 116920,
-        searchRadius = 16, requirements = emptyList(),
-    ).choosing("Main fortress"),
-)
+WebWalker.options.useItems = false   // never route through a teleport item
 ```
 
-The walker waits for the dialog and picks the option whose text contains it.
+`WebLink.byOption(n)` makes an `ITEM` link fire the item's option by its number,
+counting from one, for an item whose option text changes.
 
 #### Teleport spells
 
@@ -711,9 +726,14 @@ if (canCastTeleportSpell(TeleportSpell.CAMELOT)) castTeleportSpell(TeleportSpell
 or the open book, and returns true once you have landed. From Java:
 `Wait.castTeleportSpell(TeleportSpell.CAMELOT, landed -> ...)`. In a traversal,
 `castSpell(TeleportSpell.CAMELOT, destinationArea)` does the same as a node.
+For a spell with more than one destination, name the Magic book op:
+`castTeleportSpell(TeleportSpell.VARROCK, "Grand Exchange")`.
 
 `Lodestone.X.isUnlocked()` tells you whether a lodestone is unlocked, and
-`useLodestone(Lodestone.X)` teleports to one yourself. `openLodestoneMap()`
+`useLodestone(Lodestone.X)` teleports to one yourself. `lodestoneTeleport(Lodestone.X)`
+does the same and waits out the landing, returning a `LodestoneResult`:
+`LANDED`, `NOT_STARTED`, `INTERRUPTED` (a hit or a walk click cancelled the
+cast), `STOPPED` or `TIMED_OUT`. `openLodestoneMap()`
 opens the lodestone network from the minimap (either minimap layout) and
 `isLodestoneUiOpen` tells you when it is open. `Lodestone.WENDLEWICK` is new.
 `isUnlocked()` still reports Lunar Isle, Bandit Camp and the City of Um as
