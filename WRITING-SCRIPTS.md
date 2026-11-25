@@ -1625,11 +1625,16 @@ numbers are there too: `xpGained`, `xpPerHour`, `levelsGained`,
 ./gradlew installScripts
 ```
 
-That builds the jar and copies it to `~/.projectx/scripts/`, which is where the
-engine loads script jars from. Kotlin and Java scripts ship in the same jar and
-are discovered the same way. Start the engine, or click **Reload** in the
-overlay's Library tab, then find your script in the **Store** tab under **Your
-scripts** and click **Add** to put it in your Library.
+That builds the jar and copies it to `~/.projectx/scripts/dev/`, the folder for
+scripts you build yourself. Kotlin and Java scripts ship in the same jar and are
+discovered the same way. Start the engine, or click **Reload** in the overlay,
+then open **Scripts > Local**: your scripts are listed there, apart from the
+Library and the Store, which only hold what the store installs. A local build of
+a script that is also on the store shows separately and never replaces the
+store's copy. It still runs only once your account has the script on the store.
+
+Over MCP, `start_script` takes `"Name (local)"` or `"Name (store)"` to pick a
+copy; a bare name prefers your local build.
 
 While iterating, rebuild and hot-reload rather than restarting the client.
 

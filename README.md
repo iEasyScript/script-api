@@ -64,7 +64,7 @@ reload Gradle once after switching - the old resolution is cached.
 Build with JDK 25 and Kotlin 2.4.0 to match the engine, and edit in IntelliJ IDEA 2026.1 or newer: older IDEs cannot read Kotlin 2.4 classes and show every API import as unresolved. Java scripts extend
 `JavaScript` rather than `Script`; the guide explains why.
 
-The engine loads script jars from `~/.projectx/scripts/`.
+Put the scripts you build in `~/.projectx/scripts/dev/`. The engine lists them in the overlay under **Scripts > Local**, apart from everything the store installs in `~/.projectx/scripts/`.
 
 ## Where to start
 
