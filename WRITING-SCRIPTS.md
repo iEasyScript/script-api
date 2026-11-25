@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.40.0
+├── gradle.properties      <- projectxApiVersion=1.41.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -414,6 +414,7 @@ Use these instead of writing your own:
 | `useInventoryOrActionBarItem(option, itemIds...)` | Use an item from the pack, or the action bar if it is not there |
 | `getInventory().findByNameContaining(text)` | The first item whose name contains `text` |
 | `getInventory().getUsedSlots()` | How many slots are filled |
+| `getInventory().getFreeSlots()`, `getCapacity()` | Free slots, and how many the inventory has: an empty backpack reports 28 free even before the client has built it |
 | `dropItems { item -> ... }` | Drops every backpack item the filter picks, one at a time, waiting for each slot to empty before the next; returns how many were dropped |
 | `isPlayerIdle()`, `isPlayerBusy()`, `isDiveReady()` | Player state checks |
 | `npc.headbarFill(type)` | The current fill of an NPC's or player's headbar of that type, or -1 while it is not shown |
