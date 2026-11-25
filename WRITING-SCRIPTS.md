@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.39.0
+├── gradle.properties      <- projectxApiVersion=1.40.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -335,7 +335,7 @@ public Wait onLoop() {
 | `clickKey`, `findAndPickupItems`, `checkPorter`, `captureSerenSpirit` | `Wait.clickKey`, `Wait.findAndPickupItems`, `Wait.checkPorter`, `Wait.captureSerenSpirit` |
 | `togglePrayer`, `toggleQuickPrayers` | `Wait.togglePrayer`, `Wait.toggleQuickPrayers` |
 | `summonConjures` | `Wait.summonConjures` |
-| `reclaimFromDeath`, `faceTile`, `surgeToward` | `Wait.` + the same names |
+| `reclaimFromDeath`, `recoverFromDeath`, `faceTile`, `surgeToward` | `Wait.` + the same names |
 | `castAndWaitForCd`, `castWithAdren`, `castIf`, `smartCast`, `castWithEffectStacks` | `Wait.` + the same names |
 | `makeX`, `makeXSelect`, `makeXConfirm`, `selectMakeCategory`, `makeXReaction` | `Wait.` + the same names |
 | `smithSetQuantity`, `smithSelectTier`, `smithSelectItem`, `smithMake` | `Wait.` + the same names |
@@ -346,6 +346,7 @@ public Wait onLoop() {
 | `typeText`, `pressKey`, `performEmote` | `Wait.` + the same names |
 | `solvePuzzleBox`, `takeFromClueCarrier` | `Wait.` + the same names |
 | `enterBankPin`, `openNearestBank`, `loadLastPresetNearestBank` | `Wait.` + the same names |
+| `viewAllBankTabs`, `withdrawBankAmount`, `depositBankAmount`, `equipBankItem`, `loadBankPresetPaged`, `saveBankPreset` | `Wait.` + the same names (by item id or name) |
 | `fillOreBox` | `Wait.fillOreBox` |
 | `dropItems` | `Wait.dropItems` (a `Predicate<Item>`) |
 | `geOpen`, `geBuy`, `geBuyAtGuidePrice`, `geSell`, `geAbort`, `geCollectAll`, `awaitGrandExchangePrices` | `Wait.` + the same names; `Wait.geBuyInSlot` / `geBuyAtGuidePriceInSlot` / `geSellInSlot` to pick the slot |
@@ -425,11 +426,38 @@ Use these instead of writing your own:
 | `Quests.isCompleted("Cook's Assistant")`, `Quests.progress(id)` | Quest state from the cache's quest definitions, by name or id |
 | `item.hasPerk(Perk.EQUILIBRIUM)`, `Perks.of(item)`, `Perks.rank(item, perk)` | Invention perks on an augmented item |
 | `AttackMemory.isUnderAttack()`, `attackedRecently()` | Whether an NPC is attacking you, remembered for a few seconds after |
+| `interactClosestNPC(Regex("Cow( calf)?"), "Attack")`, `interactClosestObject(regex, option)` | The nearest NPC or object whose whole name matches, and that offers the option |
+| `onGlobalCooldown`, `globalCooldownTicks` | Whether the global cooldown has more than a tick left, and how many ticks |
+| `magicBookSlot(abilityId)`, `clickMagicBookSlot(abilityId, option)` | The Magic book's slot for an ability while the book draws it, and a click on it; the server takes the click even when the book's filters hide the slot, so check the outcome |
 
 | `getVarps().getVar(id)` / `getVarps().getVarBit(id)` | Any player var |
 
 If a script of yours needs a general helper that is not here, ask for it in
 the API rather than keeping a private copy.
+
+### Banking any amount, from any tab
+
+`withdrawBankItem(item, amount)` and `depositBankItem(item, amount)` use the
+bank's fixed ops, so they only take 1, 5, 10, or 0 for all. Any other amount,
+50 included, logs and returns false: the op after "-10" is "-<last X>", the
+last amount anyone typed, not 50. For other amounts use the waiting calls:
+
+| Kotlin | What it does |
+|---|---|
+| `withdrawBankAmount(item, amount)` | Withdraws any amount by item id or name, typing it into Withdraw-X when no fixed op fits |
+| `depositBankAmount(item, amount)` | The same from the bank's backpack view |
+| `equipBankItem(item)` | Wears a bank item |
+| `viewAllBankTabs()` | Switches the bank to View all, so items in other tabs have a slot to click; `bankTabSelected` says whether one tab is showing |
+| `loadBankPresetPaged(num)`, `saveBankPreset(num)` | Loads or saves game bank preset 1-18 (`MAX_BANK_PRESET`), turning the Presets tab to the right page first; `bankPresetPage` is the page showing |
+| `selectBankPresetTab()`, `selectBankTransferTab()` | The bank's Presets and Transfer side tabs; saving a preset leaves Presets open, so select Transfer before clicking items |
+
+The withdraw and equip calls switch to View all first, so an item in another
+tab is found. Java uses `Wait.` with the same names.
+
+```kotlin
+if (!withdrawBankAmount("Lobster", 18)) log("No lobsters")
+loadBankPresetPaged(12)
+```
 
 ### Seren spirits
 
@@ -505,6 +533,18 @@ It is a better measure than a straight line when there are walls between:
 ```kotlin
 val bank = Banks.entries.minByOrNull { walkingDistanceTo(it.tile.x, it.tile.y, it.tile.plane).takeIf { d -> d >= 0 } ?: Int.MAX_VALUE }
 ```
+
+For more than one question from the same spot, `LocalNav.field(x, y, plane)`
+searches once and returns a `WalkField`: `distanceTo(x, y, plane)`,
+`reaches(x, y, plane)`, and `distanceToFootprint(...)` for the nearest side of
+an object. `LocalNav.distance(...)` and `LocalNav.walkable(x, y, plane)` answer
+single questions; `LocalNav.UNREACHABLE` (-1) and `UNKNOWN` (-2) are the same
+answers as above, and `lastTeleportAt` is when the last teleport landed.
+
+`hasWall(x, y, plane, Direction.EAST)` says whether a wall, or the wall half
+of a door, fence or gate, closes that side of a tile, whatever stands next to
+it. It reads the live map, falling back to cache collision, and answers false
+for a diagonal.
 
 Java returns it as a wait. Pass a callback to find out how it ended:
 
@@ -844,6 +884,8 @@ plans again if the board isn't what it expected; once the picture is complete
 it presses Check and closes the box. It returns false when no box is open or
 the board couldn't be solved. `puzzleBoxOpen` says whether one is open.
 
+A clue script can list itself under `ScriptCategory.CLUES`.
+
 `takeFromClueCarrier(itemName)` takes one item, such as
 `"Sealed clue scroll (hard)"`, out of Charos' clue carrier in the backpack,
 opening and closing its window as needed, and returns true once one more is
@@ -1100,6 +1142,15 @@ if (inDeathsOffice) {
     return
 }
 ```
+
+`recoverFromDeath()` does the whole trip: it reaches Death through the War's
+Retreat portal (teleporting to War's Retreat first if needed), reclaims and
+confirms the fee, leaves through the hourglass, takes the first respawn point
+and walks an account's first death through Death's tutorial. It returns a
+`Deaths.Result`: `RECLAIMED`, `NOTHING_TO_RECLAIM`, `NEEDS_COINS`,
+`NO_DEATH_FOUND` or `TIMED_OUT`. `Deaths.itemsHeld` and `Deaths.needsRecovery`
+are safe to check on start, since what Death holds survives logout;
+`Deaths.step()` is one non-blocking pass for a tick worker.
 
 **Instance anchors.** An instance lands somewhere new each time, so a boss
 script measures its arena from something that always stands in the same place

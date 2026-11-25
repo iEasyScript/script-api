@@ -6,7 +6,9 @@ def java = System.getenv('API_DOCS_LANGUAGE') == 'java'
 
 // The packages the API changelog treats as public; everything else in the engine is suppressed.
 def apiPackages = /com\.projectx\.(script|webwalker|game\.interfaces|game\.nxt\.entity|game\.cs2|ui\.compose\.components|ui\.compose\.theme|ui\.backend\.dsl)(\..*)?/
-def partialPackages = ['com/projectx/ui': ['Setting.kt'], 'com/projectx/ui/compose': ['OverlayInput.kt']]
+def partialPackages = ['com/projectx/ui': ['Setting.kt'], 'com/projectx/ui/compose': ['OverlayInput.kt'],
+    'com/projectx/pathfinder': ['WalkMap.kt'], 'com/projectx/traversal': ['MasterFarmerHat.kt'],
+    'com/projectx/traversal/local': ['LocalNav.kt']]
 def enginePlumbing = ['ScriptLoader.kt', 'ScriptExecutor.kt', 'ClientPulseDispatcher.kt', 'InMemoryJar.kt', 'LiveValues.kt']
 
 pluginManager.apply('org.jetbrains.dokka')
@@ -30,7 +32,8 @@ dokka {
         skipEmptyPackages.set(true)
         jdkVersion.set(25)
         perPackageOption {
-            matchingRegex.set(/(?!(?:${apiPackages}|com\.projectx\.ui|com\.projectx\.ui\.compose)$).*/.toString())
+            def partial = partialPackages.keySet().collect { it.replace('/', '\\.') }.join('|')
+            matchingRegex.set(/(?!(?:${apiPackages}|${partial})$).*/.toString())
             suppress.set(true)
         }
         suppressedFiles.from(hidden)
