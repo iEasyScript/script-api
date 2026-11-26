@@ -40,7 +40,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.44.0
+├── gradle.properties      <- projectxApiVersion=1.45.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -318,9 +318,11 @@ protected boolean shouldInterrupt() {
 override fun shouldInterrupt() = standingInFloorMarker() && !alreadyDodging()
 ```
 
-Kotlin can also guard a single block rather than the whole pass.
-`interruptWhen(condition) { ... }` runs the block, cancels it once the condition
-holds, and returns `null` if it was cancelled:
+Both languages can also guard a single wait rather than the whole pass. In
+Kotlin, `interruptWhen(condition) { ... }` runs the block, cancels it once the
+condition holds, and returns `null` if it was cancelled. In Java,
+`Wait.interruptWhen(condition, wait, onInterrupted)` cuts that one wait short
+and runs `onInterrupted`; the steps after it in a sequence still run:
 
 ```kotlin
 val mined = interruptWhen({ standingInFloorMarker() }) {
@@ -329,6 +331,12 @@ val mined = interruptWhen({ standingInFloorMarker() }) {
     true
 }
 if (mined == null) dodge()
+```
+
+```java
+return Wait.sequence(
+    () -> rock.interact("Mine") ? Wait.interruptWhen(this::standingInFloorMarker, Wait.xpDrop(), this::dodge) : null,
+    () -> Wait.ms(300, 100));
 ```
 
 ### Every Kotlin helper that waits has a Wait
@@ -410,6 +418,10 @@ compiles to a name Java cannot call. Every such call has a coordinate form:
 | `getAllObjectsWithinRange(tile, range)` | `getAllObjectsWithinRange(x, y, plane, range)` |
 | `calculateClosestSafeTile(tile, ...)`, `calculateClosestReachableSafeTile(tile, ...)` | the same names with `(x, y, plane, ...)` |
 | `bresenhamLos(start, end, obstacles)` | `bresenhamLos(startX, startY, endX, endY, obstacles)` |
+| `routeToObject(tile, obj)`, `routeToNPC(tile, npc)`, `routeToTile(from, to)`, `routedDestination(tile, obj)` | the same names with `(x, y, plane, ...)`; `routeToTile(fromX, fromY, plane, toX, toY)`. A `Route` has `getSuccess()`, `getDistance()`, and `RouteKt.toTiles(route, plane)` |
+| `hasLineOfSight(src, srcSize, dst, dstSize)` | `hasLineOfSight(srcX, srcY, plane, srcSize, dstX, dstY, dstSize)` |
+| traversal steps `path`, `webWalk`, `walkExact`, `dive`, `surge`, `chebychevPath`, `interactObj(..., requestTile)` | the same names with coordinates, inside `JavaTraversal.nodes(b -> ...)`, e.g. `b.webWalk(3185, 3436, 0)`, `b.dive(3200, 3200, 0, true)` |
+| `WorldCollision.sceneBase`, `area.inside(tile)` | `WorldCollision.INSTANCE.getSceneBase()`, `area.inside(x, y)` |
 | `DangerZone(tile, radius)`, `TileArea(tile, sizeX, sizeY)` | `new DangerZone(x, y, plane, radius)`, `new TileArea(x, y, plane, sizeX, sizeY)` |
 | `Area.Rectangular(tile, tile)`, `Area.Circular(tile, radius)`, `Area.Polygonal(tiles)` | `new Area.Rectangular(x1, y1, x2, y2, plane)`, `new Area.Circular(x, y, plane, radius)`, `new Area.Polygonal(xs, ys, plane)` |
 | `area.contains(tile)` | `area.contains(x, y, plane)` |
@@ -1594,8 +1606,16 @@ public void render() {
 | Controls | `button`, `checkbox`, `inputText` (with `INPUT_` flags such as `INPUT_PASSWORD`), `inputTextMultiline`, `inputInt`, `inputFloat2` to `inputFloat4`, `sliderInt`, `sliderFloat`, `combo`, `selectable` |
 | Layout | `group`, `child`, `collapsingHeader`, `treeNode`, `table`, `properties` with `row` and `valueRow`, `tabBar` with `tabItem`, `listBox`, `styleColor`, `itemWidth` |
 | Popups | `openPopup`, `popup`, `popupModal`; close one from inside with `closeCurrentPopup()` on its scope |
+| Menus and dialogs | `menuBar`, `menu`, `menuItem`, `contextMenuItem`, `contextMenuWindow`, `contextMenuVoid`; `confirmationDialog`, `inputDialog`, `choiceDialog`; `tooltip`, `setTooltip`, `itemTooltip` |
+| More inputs | `colorEdit3`, `colorEdit4`, `colorPicker4` (`COLOR_` flags), `dragFloat`, `dragInt`, `rangeSliderFloat`, `rangeSliderInt` (`SLIDER_` flags), `arrowButton` (`DIR_`), `iconButton`, `imageButton`, `checkboxGrid`, `multiSelectListBox` (with `indexSetState`) |
+| More layout | `indent`, `unindent`, `columns`, `nextColumn`, `setColumnWidth`, `pushItemWidth`, `popItemWidth`, `setNextItemWidth`, `styleVar`, `alignTextToFramePadding`, `isItemHovered`, `isItemClicked` (`MOUSE_` buttons) |
 | Window setup | `window(title, flags, open, content)` for a window with a close button; `setNextWindowPos` (with a pivot) and `setNextWindowSize`, and their `Unsafe` forms that may leave the screen; flags as ints: `WINDOW_NO_RESIZE`, `WINDOW_ALWAYS_AUTO_RESIZE`, `COND_FIRST_USE_EVER` and the rest |
 | State | `persistentState`, `boolState`, `intState`, `floatState`, `stringState`, for values that last between frames |
+
+Java cannot import `ImGuiTexture`: its package, `com.projectx.ui.backend.native`,
+has `native` in its name, which Java reserves. Get a texture with
+`graphicTexture(id)` or `textureFromPath(path)` and hold it in a `var` local,
+then pass it to `image`, `iconButton` or `imageButton`.
 
 ### Panels drawn with Compose (Kotlin)
 

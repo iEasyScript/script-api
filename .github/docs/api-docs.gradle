@@ -5,10 +5,11 @@ def docsDir = new File(System.getenv('API_DOCS_DIR'))
 def java = System.getenv('API_DOCS_LANGUAGE') == 'java'
 
 // The packages the API changelog treats as public; everything else in the engine is suppressed.
-def apiPackages = /com\.projectx\.(script|webwalker|game\.interfaces|game\.nxt\.entity|game\.cs2|ui\.compose\.components|ui\.compose\.theme|ui\.backend\.dsl)(\..*)?/
+def apiPackages = /com\.projectx\.(script|webwalker|game\.interfaces|game\.nxt\.entity|game\.cs2|game\.items|game\.chat|ui\.compose\.components|ui\.compose\.theme|ui\.backend\.dsl)(\..*)?/
 def partialPackages = ['com/projectx/ui': ['Setting.kt'], 'com/projectx/ui/compose': ['OverlayInput.kt'],
-    'com/projectx/pathfinder': ['WalkMap.kt'], 'com/projectx/traversal': ['MasterFarmerHat.kt'],
-    'com/projectx/traversal/local': ['LocalNav.kt']]
+    'com/projectx/pathfinder': ['WalkMap.kt', 'RouteFinder.kt', 'WorldCollision.kt'],
+    'com/projectx/traversal': ['MasterFarmerHat.kt', 'TraversalBuilder.kt', 'JavaTraversal.kt'],
+    'com/projectx/traversal/local': ['LocalNav.kt'], 'com/projectx/util': ['Area.kt']]
 def enginePlumbing = ['ScriptLoader.kt', 'ScriptExecutor.kt', 'ClientPulseDispatcher.kt', 'InMemoryJar.kt', 'LiveValues.kt']
 
 pluginManager.apply('org.jetbrains.dokka')
