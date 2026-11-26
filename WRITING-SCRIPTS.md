@@ -30,7 +30,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.41.0
+├── gradle.properties      <- projectxApiVersion=1.42.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -629,6 +629,18 @@ Every walk ends with a `WebWalkResult`: its `status` says what happened,
 used one. A link that fails while walking - a quest the engine could not check,
 a worn item it could not reach - is set aside for the rest of that walk and the
 route is planned around it, so one bad link does not end the walk.
+
+`plannerUnavailable` is true when the walk failed because the route planner the
+Project X launcher runs is not running. No walk can succeed until the player starts
+the game from the launcher, so tell them so instead of retrying:
+
+```kotlin
+val result = webWalk(bankTile)
+if (result.plannerUnavailable) {
+    log("Start the game from the Project X launcher, then start the script again")
+    return stop()
+}
+```
 
 | Status | Meaning |
 |---|---|
