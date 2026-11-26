@@ -40,7 +40,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.43.0
+├── gradle.properties      <- projectxApiVersion=1.44.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -156,6 +156,7 @@ the same way:
 | `RunicAttunerKt`, `SmithingInterfaceKt`, `MakeXKt` | Runecrafting's attuner and soul altar; the smithing and Make-X interfaces |
 | `DialogueKt`, `ExtraActionKt`, `PerksKt`, `SerenSpiritsKt`, `TimeSpritesKt` | `continueDialogue`, `clickExtraAction`, `hasPerk`, `findSerenSpirit`, `findTimeSprite` |
 | `LoggingKt`, `ClientScriptsKt`, `BanksKt`, `KeyboardKt` | `log`, `runClientScript`, `bankInventoryOption`, `canTypeText` |
+| `NpcScanKt`, `LootKt`, `MagicNotepaperKt` | `attackableNpcNamesNearby`, `wantedGroundItems`, `hasRoomFor`, `getCanBeNoted(item)` |
 
 Outside `script.api`: `com.projectx.game.interfaces.ActionBarKt` (`getActionbarSlots`),
 `com.projectx.util.UtilsKt` (`gaussian`, `getXpForLevel`, `formatElapsedTime`) and
@@ -370,7 +371,7 @@ public Wait onLoop() {
 | `webWalkToArea`, `webWalkToTiles`, `findWebPathToArea` | `Wait.webWalkToArea`, `Wait.webWalkToTiles`, `Wait.findWebPathToArea` |
 | `randomizedWorldHop`, `randomizedWorldHopQuick`, `checkWorldPop`, `hopToWorld` | `Wait.randomizedWorldHop`, `Wait.randomizedWorldHopQuick`, `Wait.checkWorldPop`, `Wait.hopToWorld` |
 | `clickKey`, `findAndPickupItems`, `checkPorter`, `captureSerenSpirit` | `Wait.clickKey`, `Wait.findAndPickupItems`, `Wait.checkPorter`, `Wait.captureSerenSpirit` |
-| `togglePrayer`, `toggleQuickPrayers` | `Wait.togglePrayer`, `Wait.toggleQuickPrayers` |
+| `togglePrayer`, `toggleQuickPrayers` | `Wait.togglePrayer` (a `Prayer`, a `PrayerInfo` or a prayer's name), `Wait.toggleQuickPrayers` |
 | `summonConjures` | `Wait.summonConjures` |
 | `reclaimFromDeath`, `recoverFromDeath`, `faceTile`, `surgeToward` | `Wait.` + the same names |
 | `castAndWaitForCd`, `castWithAdren`, `castIf`, `smartCast`, `castWithEffectStacks` | `Wait.` + the same names |
@@ -385,6 +386,7 @@ public Wait onLoop() {
 | `enterBankPin`, `openNearestBank`, `loadLastPresetNearestBank` | `Wait.` + the same names |
 | `viewAllBankTabs`, `withdrawBankAmount`, `depositBankAmount`, `equipBankItem`, `loadBankPresetPaged`, `saveBankPreset` | `Wait.` + the same names (by item id or name) |
 | `fillOreBox` | `Wait.fillOreBox` |
+| `takeLootOnce`, `noteWithMagicNotepaper` | `Wait.takeLootOnce(x, y, plane, radius, everything, name -> ..., ok -> ...)`, `Wait.noteWithMagicNotepaper(item, ok -> ...)` |
 | `dropItems` | `Wait.dropItems` (a `Predicate<Item>`) |
 | `geOpen`, `geBuy`, `geBuyAtGuidePrice`, `geSell`, `geAbort`, `geCollectAll`, `awaitGrandExchangePrices` | `Wait.` + the same names; `Wait.geBuyInSlot` / `geBuyAtGuidePriceInSlot` / `geSellInSlot` to pick the slot |
 | `webWalkToObject` | `Wait.webWalkToObject(obj, onResult, useLodestones)` |
@@ -436,6 +438,22 @@ Also:
 - **Other helpers:** `isLoggedIn()` and `isPlayerLoading()`;
   `InstanceSystem.startInstance()`, `rejoinInstance()`, `hasOngoingInstance()`;
   and `getMiningStamina()`, mining stamina in points.
+
+### Looting and noting
+
+`takeLootOnce(x, y, plane, radius, everything) { name -> ... }` makes one take of
+the loot your filter accepts around a tile: an item from Area Loot when its
+window opens (Loot All when `everything`), otherwise the nearest stack off the
+ground. It returns true once the loot shrank, so coins going to the money pouch
+count. Call it again, after a pause, for the next item.
+`wantedGroundItems(...)` lists what is left that fits the backpack, and
+`hasRoomFor(id, stackable)` answers for one item. `findAndPickupItems("Coins",
+"Big bones")` picks up named items nearby, one stack at a time.
+
+`noteWithMagicNotepaper(item)` uses magic notepaper from the backpack on an
+item and returns true once it turned noted; `item.canBeNoted` says whether it
+can be. `attackableNpcNamesNearby(range)` lists the names of the NPCs around
+the player that can be attacked, for a target picker in your settings.
 
 ### Positions, interaction and items
 
@@ -1059,6 +1077,18 @@ Everything a boss script needs is in the API, so no script has to carry its own
 copy. It is all Kotlin- and Java-friendly: the managers are plain classes you
 call from your loop, and every helper that waits has a `Wait` of the same name.
 
+**Prayers.** `Prayers` lists every prayer in both books, read from the game:
+each tier of the boost prayers, Piety, Rigour, Augury, Sanctity, and every curse.
+`Prayers.named("Piety")` finds one by the game's spelling, `Prayers.currentBook`
+says which book is in use, and `togglePrayer("Piety", true)` turns it on and
+waits for the game to agree. A prayer from the other book returns false at once.
+`toggleQuickPrayers(true)` uses the player's quick prayers.
+
+| Kotlin | Java | What it gives you |
+|---|---|---|
+| `Prayers.all()`, `Prayers.inBook(book)`, `Prayers.active()` | the same, static | `PrayerInfo`: `name`, `book`, `level`, `slot`, `active`, `inCurrentBook` |
+| `togglePrayer(name or PrayerInfo, on)` | `Wait.togglePrayer(name, on, ok -> ...)` | true once the game shows the change |
+
 **The server tick.** Combat, cooldowns and prayers resolve on the server's
 600 ms tick. `delayTicks` is a local timer that drifts away from it within a few
 ticks, so anything that must land on a tick boundary counts real ticks instead:
@@ -1459,9 +1489,31 @@ public class MyScript extends JavaScript implements ConfigurableScript {
 ```
 
 Available types are `BooleanConfigItem`, `IntConfigItem`, `StringConfigItem`,
-`OptionsConfigItem`, `EnumConfigItem`, `InfoDisplayConfigItem` and
-`ConfigSection`. Read a value with `.value`, or `getValue()` from Java. The
-trailing constructor arguments are optional in both languages.
+`OptionsConfigItem`, `EnumConfigItem`, `MultiSelectConfigItem`,
+`InfoDisplayConfigItem` and `ConfigSection`. Read a value with `.value`, or
+`getValue()` from Java. The trailing constructor arguments are optional in both
+languages.
+
+`MultiSelectConfigItem` lets the user tick any number of choices; its value is
+the `Set<String>` they ticked. Give it a fixed list, or add a button that fills
+the list, such as the NPCs nearby. A ticked choice stays listed when a later
+scan no longer finds it, and a long list gets a search box:
+
+```kotlin
+val targets = MultiSelectConfigItem("Targets", "NPCs to fight.")
+    .withScan("Scan nearby") { attackableNpcNamesNearby(20) }
+val prayers = MultiSelectConfigItem("Prayers", "Prayers to keep on.", Prayers.all().map { it.name }.distinct())
+
+if (targets.isSelected(npc.name())) { /* fight it */ }
+```
+
+```java
+private final MultiSelectConfigItem targets = new MultiSelectConfigItem("Targets", "NPCs to fight.")
+    .withScan("Scan nearby", () -> attackableNpcNamesNearby(20));
+```
+
+Buttons beside settings (`withAction` and `withScan`) run on the game thread,
+so they can read NPCs, objects and the player safely.
 
 Settings are saved as the user changes them and restored on the next run, even
 after the client restarts. They are stored by field name, so renaming a field
