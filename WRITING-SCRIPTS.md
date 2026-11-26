@@ -8,9 +8,19 @@ If you are choosing: Kotlin gives you the API directly and reads more cleanly.
 Java is fully supported through a small base class that keeps it safe. Nothing
 in the API is limited to one language:
 
-- every Kotlin helper that waits has a Java `Wait` of the same name
-- every call that takes a `Tile` has a form that takes coordinates
+- every Kotlin helper that waits has a Java `Wait` of the same name, taking its
+  arguments in the same order, so a Kotlin script converts line by line
+- every call that takes or returns a `Tile` has a form Java can call
 - Java has its own overlay builder and state machine
+- a Kotlin helper that waits cannot be called from Java by mistake: it does not
+  compile, which points you at its `Wait`
+
+The one Kotlin-only feature is a [Compose panel](#panels-drawn-with-compose-kotlin),
+because Compose needs the Kotlin compiler. Java draws its windows with
+[`Overlay`](#6-show-an-overlay), which covers the same controls.
+
+The engine's tests hold the API to this. A release with a Kotlin call that has
+no Java form fails them.
 
 The two languages can live in the same project and the same jar.
 
@@ -30,7 +40,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.42.0
+├── gradle.properties      <- projectxApiVersion=1.43.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -132,6 +142,25 @@ Import the API as static methods: `import static com.projectx.script.api.APIKt.*
 For overlays, also `import static com.projectx.ui.backend.dsl.Overlay.*;` (see
 [Show an overlay](#6-show-an-overlay)).
 
+Kotlin compiles each source file's top-level functions to a class named after
+the file, so a few groups of calls live outside `APIKt`. Import the ones you use
+the same way:
+
+| `import static com.projectx.script.api.….*;` | What it holds |
+|---|---|
+| `AbilitiesKt` | `abilityReady`, `abilityOnCooldown`, `abilityCooldownTicks`, `castAbility`, `effectActive`, `effectStacks`, `activeEffects` |
+| `EquipmentKt` | `isEquipped`, `equipmentItem`, `equipmentClick` |
+| `SummoningKt` | `getFamiliarSummoned`, `getFamiliarTimeMins`, `getFamiliarScrolls`, `familiarAttack`, `familiarStoreScrolls`, `getBobStorage` |
+| `MiningKt` | `getMiningStaminaBar`, `findRockertunity`, `hasOreBox`, `oreBoxCount`, `emptyOreBoxIntoBank` |
+| `TeleportSpellsKt` | `canCastTeleportSpell`, `teleportSpellProblem`, `getCurrentSpellbook`, `magicBookSlot` |
+| `RunicAttunerKt`, `SmithingInterfaceKt`, `MakeXKt` | Runecrafting's attuner and soul altar; the smithing and Make-X interfaces |
+| `DialogueKt`, `ExtraActionKt`, `PerksKt`, `SerenSpiritsKt`, `TimeSpritesKt` | `continueDialogue`, `clickExtraAction`, `hasPerk`, `findSerenSpirit`, `findTimeSprite` |
+| `LoggingKt`, `ClientScriptsKt`, `BanksKt`, `KeyboardKt` | `log`, `runClientScript`, `bankInventoryOption`, `canTypeText` |
+
+Outside `script.api`: `com.projectx.game.interfaces.ActionBarKt` (`getActionbarSlots`),
+`com.projectx.util.UtilsKt` (`gaussian`, `getXpForLevel`, `formatElapsedTime`) and
+`com.projectx.util.NotificationsKt` (`showNotification`).
+
 `onStart()`, `onStop()`, `onEvent()`, `render()` and `shouldInterrupt()` are
 optional overrides in both languages.
 
@@ -141,10 +170,11 @@ Script bodies run on the client's main-logic tick, on the game thread. So a
 script must never block — a `Thread.sleep` would freeze the client.
 
 Kotlin handles this with suspend functions. Java cannot: the Kotlin `loop()`
-receives a continuation that Java has no way to honour. The trap is that calling
-a suspend helper from Java **compiles cleanly with no warning**, then silently
-fails to wait. You get a loop spinning at tick rate, clicking dozens of times a
-second — useless, and the most obvious thing a script can do.
+receives a continuation that Java has no way to honour. A suspend helper called
+from Java would return at once without waiting, and the loop would spin at tick
+rate, clicking dozens of times a second. So the helpers that wait are hidden
+from Java: a call like `delay(600, null)` or `webWalkTo(this, x, y, ...)` does
+not compile, and each one has a `Wait` of the same name to return instead.
 
 So `onLoop()` returns the wait it wants and the engine performs it properly.
 `loop()` is final in `JavaScript`, so you cannot reach the unsafe path by
@@ -303,9 +333,11 @@ if (mined == null) dodge()
 ### Every Kotlin helper that waits has a Wait
 
 Kotlin helpers that wait are `suspend` functions, which Java cannot call. Each
-one has a `Wait` factory of the same name that the engine runs for you. When
-the helper reports an outcome, pass an `onResult` callback. The engine calls it
-when the helper finishes, and a later step can read what it stored:
+one has a `Wait` factory of the same name that the engine runs for you, with the
+arguments in the Kotlin order: `delayUntil(3000) { bankOpen }` becomes
+`Wait.delayUntil(3000, () -> getBankOpen())`. When the helper reports an
+outcome, pass an `onResult` callback. The engine calls it when the helper
+finishes, and a later step can read what it stored:
 
 ```java
 private boolean summoned;
@@ -323,12 +355,17 @@ public Wait onLoop() {
 
 | Kotlin | Java |
 |---|---|
-| `waitForEvent`, `waitForChatContaining`, `waitForXPDrop` | `Wait.event`, `Wait.chatContaining`, `Wait.xpDrop` |
-| `waitUntilIdle`, `waitUntilStoppedMoving` | `Wait.untilIdle`, `Wait.untilStoppedMoving` |
-| `waitUntilNotMoving`, `waitUntilNotAniMoving` | `Wait.untilNotMoving`, `Wait.untilNotAniMoving` |
-| `delayTicks`, `delayBetween`, `delay(mean, variance)` | `Wait.ticks`, `Wait.between`, `Wait.ms` |
-| `pauseOthersFor` | `Wait.pauseOthersFor` |
-| `webWalk`, `useLodestone`, `teleportWithGroupSystem` | `Wait.webWalk`, `Wait.useLodestone`, `Wait.teleportWithGroupSystem` |
+| `delay`, `delayBetween`, `delayTicks`, `delayUntil`, `delayWhile` | `Wait.` + the same names; also `Wait.ms`, `between`, `ticks`, `until`, `whileTrue` |
+| `waitThenDelayUntil`, `waitThenDelayWhile` | `Wait.waitThenDelayUntil(waitForMs, timeoutMs, condition)`, `Wait.waitThenDelayWhile(...)` |
+| `waitForEvent`, `waitForChatContaining`, `waitForXPDrop` | `Wait.` + the same names; also `Wait.event`, `chatContaining`, `xpDrop` |
+| `waitUntilIdle`, `waitUntilStoppedMoving`, `waitUntilNotMoving`, `waitUntilNotAniMoving` | `Wait.` + the same names; also `Wait.untilIdle`, `untilStoppedMoving`, `untilNotMoving`, `untilNotAniMoving` |
+| `awaitServerTick`, `awaitServerTicks`, `ActionPacer.ACTIONS.await()` | `Wait.awaitServerTick`, `Wait.awaitServerTicks`, `Wait.await(ActionPacer.ACTIONS)` |
+| `pauseOthersFor`, `geReaction` | `Wait.pauseOthersFor`, `Wait.geReaction` |
+| `webWalk`, `webWalkTo`, `useLodestone`, `lodestoneTeleport`, `teleportWithGroupSystem` | `Wait.webWalk(x, y, plane)`, `Wait.webWalkTo`, `Wait.useLodestone`, `Wait.lodestoneTeleport(lodestone, onResult)`, `Wait.teleportWithGroupSystem` |
+| `findWebPath`, `canWebWalkTo`, `findWebPathToTiles`, `canWebWalkToArea` | `Wait.` + the same names, with coordinates for the tile and an `onResult` for the answer |
+| `findNearestBank` | `Wait.findNearestBank(site -> ...)` |
+| `dive(tile, ability)`, `diveThenSurge`, `surgeThenDive` | `Wait.dive(x, y, plane, ability)`, `Wait.diveThenSurge(x, y, plane, dive, hops -> ...)`, `Wait.surgeThenDive(...)` |
+| `MasterFarmerHat.refreshIfUnknown` | `Wait.refreshMasterFarmerHat(count -> ...)` |
 | `castTeleportSpell` | `Wait.castTeleportSpell` |
 | `webWalkToArea`, `webWalkToTiles`, `findWebPathToArea` | `Wait.webWalkToArea`, `Wait.webWalkToTiles`, `Wait.findWebPathToArea` |
 | `randomizedWorldHop`, `randomizedWorldHopQuick`, `checkWorldPop`, `hopToWorld` | `Wait.randomizedWorldHop`, `Wait.randomizedWorldHopQuick`, `Wait.checkWorldPop`, `Wait.hopToWorld` |
@@ -375,6 +412,12 @@ compiles to a name Java cannot call. Every such call has a coordinate form:
 | `Area.Rectangular(tile, tile)`, `Area.Circular(tile, radius)`, `Area.Polygonal(tiles)` | `new Area.Rectangular(x1, y1, x2, y2, plane)`, `new Area.Circular(x, y, plane, radius)`, `new Area.Polygonal(xs, ys, plane)` |
 | `area.contains(tile)` | `area.contains(x, y, plane)` |
 | `area.getRandomCoordinate()`, `getRandomWalkableCoordinate()`, `getCentroid()` | `area.randomTile()`, `randomWalkableTile()`, `centreTile()`, which return a `Tile` object with `getX()`, `getY()` and `getLevel()` |
+| `area.getCoordinatesInArea(tile)`, a rectangle's `getBottomLeft()` / `getTopRight()` | `area.getCoordinatesInArea(plane)`; `getMinX()`, `getMinY()`, `getMaxX()`, `getMaxY()`, `getPlane()` |
+| `npc.serverTile`, `arrow.targetTile`, `trail.destination`, `TeleportSpell.X.destination` | `getServerTile()`, `getTargetTile()`, `getDestination()`, returning a `Tile` object or null |
+| `entity.localTile`, `hintIcon.tile`, `trailPoint.tile(plane)` | `getLocalTileX()` / `getLocalTileY()`; `getTileX()`, `getTileY()`, `getPlane()` |
+| `entity.isFacing(tile, degrees)`, `isFacingAway(tile, degrees)`, `Bearings.between(a, b)` | `isFacing(x, y, degrees)`, `isFacingAway(x, y, degrees)`, `Bearings.between(fromX, fromY, toX, toY)` |
+| `bankSite.tile`, `Banks.byDistanceFrom(tile)` | `getTileX()`, `getTileY()`, `getPlane()`; `Banks.byDistanceFrom(x, y, plane)` |
+| `walkField.start`, `webPath.tile(i)` | `getStartX()`, `getStartY()`, `getStartPlane()`; `getX(i)`, `getY(i)`, `getPlane(i)` |
 | drawing `tile(tile, color)`, `tileArea`, `textOnTile`, `imageOnTile` | the same names with `(x, y, plane, ...)` |
 
 Also:
@@ -1496,9 +1539,10 @@ public void render() {
 | Kind | What `Overlay` has |
 |---|---|
 | Text | `text`, `section`, `separator`, `sameLine`, `spacing`, `progressBar`, `xpProgressBar`, `image` |
-| Controls | `button`, `checkbox`, `inputText`, `inputInt`, `sliderInt`, `sliderFloat`, `combo`, `selectable` |
+| Controls | `button`, `checkbox`, `inputText` (with `INPUT_` flags such as `INPUT_PASSWORD`), `inputTextMultiline`, `inputInt`, `inputFloat2` to `inputFloat4`, `sliderInt`, `sliderFloat`, `combo`, `selectable` |
 | Layout | `group`, `child`, `collapsingHeader`, `treeNode`, `table`, `properties` with `row` and `valueRow`, `tabBar` with `tabItem`, `listBox`, `styleColor`, `itemWidth` |
-| Window setup | `setNextWindowPos` and `setNextWindowSize`, with the flags as ints: `WINDOW_NO_RESIZE`, `WINDOW_ALWAYS_AUTO_RESIZE`, `COND_FIRST_USE_EVER` and the rest |
+| Popups | `openPopup`, `popup`, `popupModal`; close one from inside with `closeCurrentPopup()` on its scope |
+| Window setup | `window(title, flags, open, content)` for a window with a close button; `setNextWindowPos` (with a pivot) and `setNextWindowSize`, and their `Unsafe` forms that may leave the screen; flags as ints: `WINDOW_NO_RESIZE`, `WINDOW_ALWAYS_AUTO_RESIZE`, `COND_FIRST_USE_EVER` and the rest |
 | State | `persistentState`, `boolState`, `intState`, `floatState`, `stringState`, for values that last between frames |
 
 ### Panels drawn with Compose (Kotlin)
