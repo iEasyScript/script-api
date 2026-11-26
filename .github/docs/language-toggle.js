@@ -1,5 +1,7 @@
 (() => {
-    const root = new URL(window.pathToRoot ?? "", location.href);
+    // A page at the root has an empty pathToRoot, and new URL("", href) is the page itself, not its folder: on
+    // java/index.html that read as the Kotlin view and sent the Java button to java/java/index.html.
+    const root = new URL(window.pathToRoot || "./", location.href);
     const isJava = root.pathname.endsWith("/java/");
     const otherRoot = new URL(isJava ? ".." : "java/", root);
     const page = decodeURI(location.href.slice(root.href.length).split(/[?#]/)[0]) || "index.html";
