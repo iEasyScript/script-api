@@ -40,7 +40,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.46.0
+├── gradle.properties      <- projectxApiVersion=1.47.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -772,9 +772,8 @@ which completes with the same result. Never call the blocking
 A `WebLink` says where it starts (`from`), where it comes out (`to`), what kind
 it is (`kind`) and the option to use (`action`); both endpoints are `WebArea`
 rectangles, because a staircase drops you anywhere in the room at the top.
-`WebLinks.all` is the whole set, `WebLinks.from(x, y, plane)` is what can be
-taken from one tile, and `WebLinks.globals` is the teleports, which can be taken
-from anywhere.
+Every link is a step of a route the launcher's navpath service planned; there is
+no separate link set to read or add to.
 
 | `kind` | What the walker does | What the link carries |
 |---|---|---|
@@ -800,18 +799,16 @@ account cannot use is left out of the route. A condition the engine does not
 recognise counts as met, so an unknown gate costs a re-plan rather than making a
 place unreachable.
 
-A link that uses an item is only taken while the item is carried. The link set
-is curated, so a route that needs something not in it reports `NO_PATH`.
+A link that uses an item is only taken while the item is carried. When navpath
+finds no route, the walk reports `NO_PATH`.
 
 Some ways through ask where to go rather than simply moving you - Kharid-et's
 fort entrance opens a "Choose destination." list. The walker waits for the
 dialog and picks the option the link names.
 
-`WebLinks.register`, `WebLinks.registerObjectLink` and `WebLinkPermissions` are
-deprecated. Routes are planned only on the launcher's navpath map, so a link a
-script registers is listed in `WebLinks.all` but never routed through. Scripts
-built against them still load. A way through the set lacks belongs in the
-engine's `links.json`; ask for it to be added.
+`WebLinks` and `WebLinkPermissions` were removed in 1.47.0, with the engine's own
+link set. A script that used them must stop doing so before it runs on engine
+1.36.0 or newer.
 
 #### Changing how a walk routes
 
