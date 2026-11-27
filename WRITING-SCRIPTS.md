@@ -1566,6 +1566,49 @@ A holder may hold further holders. Items inside one are stored under
 `<holder field>.<item field>`, so two holders can use the same field name, and
 settings saved before you moved your items into a holder are still read back.
 
+### Settings that change while the script runs
+
+The panel redraws itself on every change, so nothing is needed to make a toggle
+show. A running script is edited in place: read `.value` when you use a setting,
+rather than copying it into a variable at start, and a change takes effect on the
+next loop. To react to a change straight away, give the script a public
+`onConfigUpdated()`; the engine calls it after every edit:
+
+```kotlin
+fun onConfigUpdated() {
+    if (!settings.useVeng.value) vengeanceTimer.reset()
+}
+```
+
+```java
+public void onConfigUpdated() {
+    if (!settings.useVeng.getValue()) vengeanceTimer.reset();
+}
+```
+
+To show a setting only when another one is on, implement
+`ConfigVisibilityProvider` on the script. It is asked for each item by its field
+name (the field inside a `ConfigHolder`, without the holder's name) and hidden
+items reappear as soon as the setting they depend on changes:
+
+```kotlin
+class Sanctum : Script(), ConfigurableScript, ConfigVisibilityProvider {
+    private val settings = SanctumConfig()
+
+    override fun isConfigItemVisible(fieldName: String, item: ConfigItem<*>) = when (fieldName) {
+        "bonfirePreset" -> settings.useBonfirePreset.value
+        else -> true
+    }
+}
+```
+
+```java
+@Override
+public boolean isConfigItemVisible(String fieldName, ConfigItem<?> item) {
+    return !fieldName.equals("bonfirePreset") || settings.useBonfirePreset.getValue();
+}
+```
+
 ## 6. Show an overlay
 
 Override `render()` to draw a window of your own or to mark things in the game
