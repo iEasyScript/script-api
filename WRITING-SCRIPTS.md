@@ -40,7 +40,7 @@ the JetBrains Toolbox or Help → Check for Updates.
 my-scripts/
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties      <- projectxApiVersion=1.45.0
+├── gradle.properties      <- projectxApiVersion=1.46.0
 ├── src/main/kotlin/...    <- Kotlin scripts
 └── src/main/java/...      <- Java scripts
 ```
@@ -390,7 +390,7 @@ public Wait onLoop() {
 | `bobStore`, `bobWithdraw` (pairs) | `Wait.bobStoreById` / `bobStoreByName`, `Wait.bobWithdrawById` / `bobWithdrawByName` (a `Map` of amounts) |
 | `joinInstance`, `confirmInstanceDialogue`, `startOrRejoinInstance` | `Wait.` + the same names |
 | `typeText`, `pressKey`, `performEmote` | `Wait.` + the same names |
-| `solvePuzzleBox`, `takeFromClueCarrier` | `Wait.` + the same names |
+| `solvePuzzleBox`, `solvePuzzleBox(stopWhen)`, `closePuzzleBox`, `takeFromClueCarrier` | `Wait.` + the same names; `Wait.solvePuzzleBox(stopWhen, ok -> ...)` takes a `BooleanSupplier` |
 | `enterBankPin`, `openNearestBank`, `loadLastPresetNearestBank` | `Wait.` + the same names |
 | `viewAllBankTabs`, `withdrawBankAmount`, `depositBankAmount`, `equipBankItem`, `loadBankPresetPaged`, `saveBankPreset` | `Wait.` + the same names (by item id or name) |
 | `fillOreBox` | `Wait.fillOreBox` |
@@ -968,7 +968,15 @@ while (isDialogOpen()) {
 with the arrow keys one slide at a time, waits for each slide to land, and
 plans again if the board isn't what it expected; once the picture is complete
 it presses Check and closes the box. It returns false when no box is open or
-the board couldn't be solved. `puzzleBoxOpen` says whether one is open.
+the board couldn't be solved. `puzzleBoxOpen` says whether one is open, and
+`puzzleBoxSolved` whether its picture is complete.
+
+`solvePuzzleBox(stopWhen)` asks `stopWhen` before every slide; once it holds,
+the box is left open where it stood and the call returns false, so you can deal
+with an attacker or a time limit and solve on later. `closePuzzleBox()` shuts
+the box (its close button, then Escape) and returns true once it is gone;
+`clickPuzzleBoxClose()` makes one click without waiting. The solver plans off
+the game thread, so a long search no longer freezes the client.
 
 A clue script can list itself under `ScriptCategory.CLUES`.
 
